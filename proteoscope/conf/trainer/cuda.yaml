@@ -8,3 +8,4 @@ limit_val_batches: 20 # 20
 log_every_n_steps: 2 # 50
 batch_size: 32
 num_workers: 0
+accumulate: 1

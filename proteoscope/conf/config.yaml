@@ -7,3 +7,5 @@ defaults:
 hydra:
   run:
     dir: /home/ec2-user/outputs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+
+  chkpt: null
