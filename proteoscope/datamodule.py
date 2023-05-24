@@ -34,6 +34,7 @@ class ProteoscopeDataModule(LightningDataModule):
     def setup(self, stage=None):
         self.images = zarr.open(self.images_path, mode="r")
         self.labels = pd.read_csv(self.labels_path, index_col=0)
+        self.labels = self.labels.fillna('')
 
         self.train_dataset = ProteoscopeDataset(
             images=self.images,
@@ -73,7 +74,7 @@ class ProteoscopeDataModule(LightningDataModule):
         else:
             dataset = self.val_images_dataset
         return DataLoader(
-            self.val_dataset,
+            dataset,
             batch_size=self.batch_size,
             shuffle=False,
             num_workers=self.num_workers,

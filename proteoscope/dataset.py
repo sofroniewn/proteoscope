@@ -48,9 +48,7 @@ class ProteoscopeDataset(Dataset):
         row = self.labels.iloc[idx]
         index = row.name
         images = self.images[index, :, :, :2]
-
-        if self.transform is not None:
-            images = self.transform(images)
+        images = self.transform(images)
 
         item = dict()
         item["index"] = index
@@ -61,6 +59,6 @@ class ProteoscopeDataset(Dataset):
         item["loc_grade3"] = row.loc_grade3
         item["protein_id"] = row.protein_id
         item["FOV_id"] = row.FOV_id
-        item["prot"] = images[0, :, :]
-        item["nuc"] = images[1, :, :]
+        item["label"] = row.label
+        item["image"] = images.float()
         return item

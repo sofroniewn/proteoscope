@@ -12,7 +12,7 @@ with open("HISTORY.rst") as history_file:
 
 requirements = []
 
-test_requirements = ["pytest>=3", "git+https://github.com/royerlab/cytoself@main"]
+test_requirements = ["pytest>=3"]
 
 setup(
     author="Nicholas Sofroniew",
