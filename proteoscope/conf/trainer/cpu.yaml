@@ -1,0 +1,6 @@
+device: cpu
+num_devices: 1
+gradient_clip_val: null
+precision: 16
+max_epochs: 10_000
+check_val_every_n_epoch: 5

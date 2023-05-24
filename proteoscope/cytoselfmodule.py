@@ -10,25 +10,24 @@ from cytoself.trainer.autoencoder.cytoselffull import CytoselfFull
 class CytoselfLightningModule(LightningModule):
     def __init__(
         self,
-        # train_args: dict,
-        model_args: dict,
+        num_classes,
+        module_config,
+        image_variance = 1.0,
     ):
         super(CytoselfLightningModule, self).__init__()
+        self.image_variance = image_variance
+
+        model_args = module_config.model.dict()
+        model_args['num_classes'] = num_classes
         self.model = CytoselfFull(**model_args)
 
-        self.optim_config = {
-            'learning_rate' : 0.0004,
-            'beta_1' : 0.9,
-            'beta_2' : 0.98,
-            'eps' : 0.00000001,
-            'weight_decay' : 0.01,
-        }
+        self.optim_config = module_config.optim_config
 
         self.image_criterion = nn.MSELoss()
         self.labels_criterion = nn.CrossEntropyLoss()
-        self.image_variance = 1.0
-        self.vq_coeff = 1.0
-        self.fc_coeff = 1.0
+        self.vq_coeff = module_config.vq_coeff
+        self.fc_coeff = module_config.fc_coeff
+
 
     def forward(self, batch):
         return self.model.forward(batch)

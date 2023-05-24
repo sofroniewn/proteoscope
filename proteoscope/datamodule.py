@@ -18,8 +18,8 @@ class ProteoscopeDataModule(LightningDataModule):
         self,
         images_path: str,
         labels_path: str,
-        batch_size: int = 32,
-        num_workers: int = 0,
+        batch_size: int,
+        num_workers: int,
     ):
         super().__init__()
 
