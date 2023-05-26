@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from pytorch_lightning import LightningModule
+from omegaconf import OmegaConf
 
 from cytoself.trainer.autoencoder.cytoselffull import CytoselfFull
 
@@ -10,18 +11,21 @@ from cytoself.trainer.autoencoder.cytoselffull import CytoselfFull
 class CytoselfLightningModule(LightningModule):
     def __init__(
         self,
-        num_classes,
+        num_class,
         module_config,
         image_variance = 1.0,
     ):
         super(CytoselfLightningModule, self).__init__()
         self.image_variance = image_variance
 
-        model_args = module_config.model.dict()
-        model_args['num_classes'] = num_classes
+        model_args = module_config.model
+        model_args['num_class'] = num_class
+        # Conversion needed due to https://github.com/royerlab/cytoself/blob/9f482391a8e7101fde007184f321471cb983d94e/cytoself/trainer/autoencoder/cytoselffull.py#L382
+        model_args = OmegaConf.to_container(model_args)
+
         self.model = CytoselfFull(**model_args)
 
-        self.optim_config = module_config.optim_config
+        self.optim_config = module_config.optimizer
 
         self.image_criterion = nn.MSELoss()
         self.labels_criterion = nn.CrossEntropyLoss()
@@ -51,16 +55,15 @@ class CytoselfLightningModule(LightningModule):
                 vq_loss_dict[key0 + '_' + key1] = val1.item()
         output.update(vq_loss_dict)
 
-        return output
+        return loss, output
 
     def training_step(self, batch, batch_idx, dataloader_idx=0):
         images = batch['image']
         labels = batch['label']
         output_images, output_logits = self.model(images)
-        outputs = self._calc_losses(images, labels, output_images, output_logits)        
-        loss = outputs['loss']
+        loss, all_outputs = self._calc_losses(images, labels, output_images, output_logits)        
 
-        for key, value in outputs.items():
+        for key, value in all_outputs.items():
             self.log(
                 "train_" + key, value, on_step=True, on_epoch=False, prog_bar=True, logger=True
             )
@@ -71,9 +74,9 @@ class CytoselfLightningModule(LightningModule):
         images = batch['image']
         labels = batch['label']
         output_images, output_logits = self.model(images)
-        outputs = self._calc_losses(images, labels, output_images, output_logits)        
+        loss, all_outputs = self._calc_losses(images, labels, output_images, output_logits)        
 
-        for key, value in outputs.items():
+        for key, value in all_outputs.items():
             self.log(
                 "val_" + key, value, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True
             )
@@ -95,6 +98,6 @@ class CytoselfLightningModule(LightningModule):
         # )
         return optimizer
 
-    def optimizer_step(self, *args, **kwargs):
-        super().optimizer_step(*args, **kwargs)
-        # self.lr_scheduler.step()  # Step per iteration
+    # def optimizer_step(self, *args, **kwargs):
+    #     super().optimizer_step(*args, **kwargs)
+    #     self.lr_scheduler.step()  # Step per iteration

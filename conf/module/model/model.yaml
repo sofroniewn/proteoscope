@@ -1,0 +1,9 @@
+input_shape: [2, 100, 100]
+emb_shapes: [[25, 25], [4, 4]]
+output_shape: [2, 100, 100]
+fc_output_idx: [2]
+vq_args:
+  num_embeddings: 512
+  embedding_dim: 64
+fc_input_type: 'vqvec'
+num_class: null

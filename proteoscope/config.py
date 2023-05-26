@@ -22,6 +22,7 @@ class ModelConfig:
     output_shape: Tuple[int]
     fc_output_idx: Tuple[int]
     fc_input_type: str
+    num_class: Optional[int]
 
 
 @dataclass

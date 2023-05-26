@@ -1,0 +1,14 @@
+defaults:
+  - data: data
+  - module/optimizer: adamw
+  - module/model: model
+  - trainer: cuda
+
+hydra:
+  run:
+    dir: /home/ec2-user/outputs-proteoscope/${now:%Y-%m-%d}/${now:%H-%M-%S}
+
+chkpt: null
+module:
+  vq_coeff: 1.0
+  fc_coeff: 1.0

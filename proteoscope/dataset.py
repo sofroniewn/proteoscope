@@ -34,6 +34,7 @@ class ProteoscopeDataset(Dataset):
             (labels["split_protein"] == self.split_protein)
             & (labels["split_images"] == self.split_images)
         ]
+        self.num_label_class = len(self.labels['label'].unique())
 
         self.images = images
         self.transform = transforms.Compose(

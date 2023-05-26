@@ -59,6 +59,8 @@ class ProteoscopeDataModule(LightningDataModule):
             transform=None,
         )
 
+        self.num_class = self.train_dataset.num_label_class
+
     def train_dataloader(self):
         return DataLoader(
             self.train_dataset,
