@@ -9,8 +9,8 @@ if __name__ == "__main__":
 
 
     GENE2PROTEIN_PATH = '/home/ec2-user/cytoself-data/sequences.csv'
-    PROTEIN_EMBED_PATH_F = '/home/ec2-user/esm/ESM_sequence_embeddings_full.zarr'
-    PROTEIN_EMBED_PATH_R = '/home/ec2-user/esm/ESM_sequence_embeddings_reduced.zarr'
+    PROTEIN_EMBED_PATH_F = '/home/ec2-user/cytoself-data/ESM_sequence_embeddings_full.zarr'
+    PROTEIN_EMBED_PATH_R = '/home/ec2-user/cytoself-data/ESM_sequence_embeddings_reduced.zarr'
 
     EMBED_DIM = 1280
     EMBEDDING_LAYER = 33
@@ -72,4 +72,4 @@ if __name__ == "__main__":
             mean = representations[i, 1:truncate_len + 1].mean(dim=0)
             z_embedding_prot_r[index, 0, :] = bos.detach().cpu().numpy()
             z_embedding_prot_r[index, 1, :] = mean.detach().cpu().numpy()
-            z_embedding_prot_f[index, :truncate_len + 1] = representations[i, 1:truncate_len + 1]
+            z_embedding_prot_f[index, :truncate_len + 1] = representations[i, :truncate_len + 1].detach().cpu().numpy()
