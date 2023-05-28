@@ -59,6 +59,8 @@ class ProteoscopeDataset(Dataset):
         item["loc_grade2"] = row.loc_grade2
         item["loc_grade3"] = row.loc_grade3
         item["protein_id"] = row.protein_id
+        item["peptide"] = row['Peptide']
+        item["ensp"] = row['Protein stable ID']
         item["FOV_id"] = row.FOV_id
         item["label"] = row.label
         item["image"] = images.float()

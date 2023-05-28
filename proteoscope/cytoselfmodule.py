@@ -13,7 +13,7 @@ class CytoselfLightningModule(LightningModule):
         self,
         num_class,
         module_config,
-        image_variance = 1.0,
+        image_variance = 285.1651773361865,
     ):
         super(CytoselfLightningModule, self).__init__()
         self.image_variance = image_variance
