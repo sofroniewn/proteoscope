@@ -13,6 +13,8 @@ class ProteoscopeDataset(Dataset):
         labels,
         split_protein: str,
         split_images: str = "",
+        sequences = None,
+        sequence_index = None,
         transform: Optional[Sequence] = (
             transforms.RandomApply(
                 [
@@ -42,6 +44,9 @@ class ProteoscopeDataset(Dataset):
             + ([] if transform is None else list(transform))
         )
 
+        self.sequences = sequences
+        self.sequence_index = sequence_index
+
     def __len__(self) -> int:
         return len(self.labels)
 
@@ -62,6 +67,19 @@ class ProteoscopeDataset(Dataset):
         item["peptide"] = row['Peptide']
         item["ensp"] = row['Protein stable ID']
         item["FOV_id"] = row.FOV_id
+        item["seq_embedding_index"] = row['seq_embedding_index']
+        item["truncation"] = row['truncation']
         item["label"] = row.label
         item["image"] = images.float()
+
+        if self.sequences is not None:
+            if self.sequence_index is not None:
+                sequence_embed = self.sequences[item["seq_embedding_index"], self.sequence_index]
+                sequence_mask = None
+            else:
+                sequence_embed = self.sequences[item["seq_embedding_index"], 1:]
+                sequence_mask = torch.zeros(len(sequence_embed), dtype=torch.bool)
+                sequence_mask[:row['truncation']] = True
+            item['sequence_embed'] = sequence_embed
+            item['sequence_mask'] = sequence_mask
         return item

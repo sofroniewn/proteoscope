@@ -20,11 +20,13 @@ class ProteoscopeDataModule(LightningDataModule):
         labels_path: str,
         batch_size: int,
         num_workers: int,
+        sequences_path: Optional[str] = None,
     ):
         super().__init__()
 
         self.images_path = images_path
         self.labels_path = labels_path
+        self.sequences_path = sequences_path
         self.batch_size = batch_size
         self.num_workers = num_workers
 
@@ -36,9 +38,15 @@ class ProteoscopeDataModule(LightningDataModule):
         self.labels = pd.read_csv(self.labels_path, index_col=0)
         self.labels = self.labels.fillna('')
 
+        if self.sequences_path is not None:
+            self.sequences = zarr.open(self.sequences_path, 'r')
+        else:
+            self.sequences = None
+
         self.train_dataset = ProteoscopeDataset(
             images=self.images,
             labels=self.labels,
+            sequences=self.sequences,
             split_protein="train",
             split_images="train",
         )
@@ -46,6 +54,7 @@ class ProteoscopeDataModule(LightningDataModule):
         self.val_images_dataset = ProteoscopeDataset(
             images=self.images,
             labels=self.labels,
+            sequences=self.sequences,
             split_protein="train",
             split_images="val",
             transform=None,
@@ -54,6 +63,7 @@ class ProteoscopeDataModule(LightningDataModule):
         self.val_proteins_dataset = ProteoscopeDataset(
             images=self.images,
             labels=self.labels,
+            sequences=self.sequences,
             split_protein="val",
             split_images="",
             transform=None,

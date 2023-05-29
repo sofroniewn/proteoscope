@@ -1,2 +1,3 @@
 images_path: '/home/ec2-user/cytoself-data/images.zarr'
 labels_path: '/home/ec2-user/cytoself-data/labels.csv'
+sequences_path: null
