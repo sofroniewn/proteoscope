@@ -80,7 +80,7 @@ class ProteoscopeDataModule(LightningDataModule):
             pin_memory=True,
         )
 
-    def val_dataloader(self, novel_proteins=False):
+    def val_dataloader(self, novel_proteins=False, shuffle=False):
         if novel_proteins:
             dataset = self.val_proteins_dataset
         else:
@@ -88,7 +88,7 @@ class ProteoscopeDataModule(LightningDataModule):
         return DataLoader(
             dataset,
             batch_size=self.batch_size,
-            shuffle=False,
+            shuffle=shuffle,
             num_workers=self.num_workers,
             pin_memory=True,
         )

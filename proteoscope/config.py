@@ -33,6 +33,8 @@ class OptimizerConfig:
     beta_2: float
     eps: float
     weight_decay: float
+    warmup: int
+    max_iters: int
 
 
 @dataclass

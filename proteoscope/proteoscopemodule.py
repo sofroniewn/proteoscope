@@ -4,6 +4,7 @@ import torch.optim as optim
 from pytorch_lightning import LightningModule
 
 from imagen_pytorch import Unet, Imagen
+from .utils import CosineWarmupScheduler
 
 
 class ProteoscopeLightningModule(LightningModule):
@@ -19,7 +20,7 @@ class ProteoscopeLightningModule(LightningModule):
 
         unet1 = Unet(
             dim = 128,
-            cond_dim = 64,
+            cond_dim = 128,
             dim_mults = (1, 2, 4),
             num_resnet_blocks = 3,
             layer_attns = (False, True, True),
@@ -41,15 +42,14 @@ class ProteoscopeLightningModule(LightningModule):
 
         self.model = Imagen(
             unets = (unet1, unet2),
-            image_sizes = (64, 100),
-            timesteps = 20,
+            image_sizes = (32, 100),
+            timesteps = 1000,
             cond_drop_prob = 0.1,
             channels=1,
             text_embed_dim=1280,
         )
 
         self.optim_config = module_config.optimizer
-
 
     def forward(self, batch):
         return self.model.forward(batch)
@@ -88,13 +88,13 @@ class ProteoscopeLightningModule(LightningModule):
             eps=self.optim_config.eps,
             weight_decay=self.optim_config.weight_decay,
         )
-        # self.lr_scheduler = CosineWarmupScheduler(
-        #     optimizer,
-        #     warmup=self.optim_config.warmup,
-        #     max_iters=self.optim_config.max_iters,
-        # )
+        self.lr_scheduler = CosineWarmupScheduler(
+            optimizer,
+            warmup=self.optim_config.warmup,
+            max_iters=self.optim_config.max_iters,
+        )
         return optimizer
 
-    # def optimizer_step(self, *args, **kwargs):
-    #     super().optimizer_step(*args, **kwargs)
-    #     self.lr_scheduler.step()  # Step per iteration
+    def optimizer_step(self, *args, **kwargs):
+        super().optimizer_step(*args, **kwargs)
+        self.lr_scheduler.step()  # Step per iteration
