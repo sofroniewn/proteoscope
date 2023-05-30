@@ -6,6 +6,6 @@ max_epochs: 10_000
 val_check_interval: 1000 # 1000
 limit_val_batches: 20 # 20
 log_every_n_steps: 2 # 50
-batch_size: 64
+batch_size: 32
 num_workers: 4
-accumulate: 1
+accumulate: 2

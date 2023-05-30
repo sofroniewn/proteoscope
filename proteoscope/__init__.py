@@ -5,4 +5,4 @@ __email__ = "sofroniewn@gmail.com"
 __version__ = "0.0.0"
 
 from .config import ProteoscopeConfig
-from .train import train
+from .train_proteoscope import train
