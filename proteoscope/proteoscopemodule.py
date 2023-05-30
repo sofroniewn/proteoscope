@@ -5,48 +5,30 @@ from pytorch_lightning import LightningModule
 
 from imagen_pytorch import Unet, Imagen
 from .utils import CosineWarmupScheduler
+from omegaconf import OmegaConf
 
 
 class ProteoscopeLightningModule(LightningModule):
     def __init__(
         self,
-        unet_number,
         module_config,
     ):
         super(ProteoscopeLightningModule, self).__init__()
 
-        # model_args = module_config.model
-        self.unet_number = unet_number
+        self.unet_number = module_config.unet_number
+        unet1_args = OmegaConf.to_container(module_config.model.unet1)
+        unet2_args = OmegaConf.to_container(module_config.model.unet2)
 
-        unet1 = Unet(
-            dim = 128,
-            cond_dim = 128,
-            dim_mults = (1, 2, 4),
-            num_resnet_blocks = 3,
-            layer_attns = (False, True, True),
-            layer_cross_attns = (False, True, True),
-            cond_images_channels = 1,
-            channels=1,
-        )
-
-        unet2 = Unet(
-            dim = 128,
-            cond_dim = 128,
-            dim_mults = (1, 2, 4),
-            num_resnet_blocks = (2, 4, 8),
-            layer_attns = (False, False, True),
-            layer_cross_attns = (False, False, True),
-            cond_images_channels = 1,
-            channels=1,
-        )
+        unet1 = Unet(**unet1_args)
+        unet2 = Unet(**unet2_args)
 
         self.model = Imagen(
             unets = (unet1, unet2),
-            image_sizes = (32, 100),
-            timesteps = 1000,
-            cond_drop_prob = 0.1,
-            channels=1,
-            text_embed_dim=1280,
+            image_sizes = tuple(module_config.model.image_sizes),
+            timesteps = module_config.model.timesteps,
+            cond_drop_prob = module_config.model.cond_drop_prob,
+            channels=module_config.model.channels,
+            text_embed_dim=module_config.model.text_embed_dim,
         )
 
         self.optim_config = module_config.optimizer

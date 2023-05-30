@@ -7,3 +7,5 @@ vq_args:
   embedding_dim: 64
 fc_input_type: 'vqvec'
 num_class: null
+vq_coeff: 1.0
+fc_coeff: 1.0

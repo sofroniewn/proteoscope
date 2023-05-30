@@ -21,7 +21,6 @@ def train(config: ProteoscopeConfig) -> None:
 
     clm = ProteoscopeLightningModule(
         module_config=config.module,
-        unet_number=1,
     )
     print(clm)
     print(

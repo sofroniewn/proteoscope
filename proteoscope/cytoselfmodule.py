@@ -22,6 +22,8 @@ class CytoselfLightningModule(LightningModule):
         model_args['num_class'] = num_class
         # Conversion needed due to https://github.com/royerlab/cytoself/blob/9f482391a8e7101fde007184f321471cb983d94e/cytoself/trainer/autoencoder/cytoselffull.py#L382
         model_args = OmegaConf.to_container(model_args)
+        del model_args['vq_coeff']
+        del model_args['fc_coeff']
 
         self.model = CytoselfFull(**model_args)
 
@@ -29,8 +31,8 @@ class CytoselfLightningModule(LightningModule):
 
         self.image_criterion = nn.MSELoss()
         self.labels_criterion = nn.CrossEntropyLoss()
-        self.vq_coeff = module_config.vq_coeff
-        self.fc_coeff = module_config.fc_coeff
+        self.vq_coeff = module_config.model.vq_coeff
+        self.fc_coeff = module_config.model.fc_coeff
 
 
     def forward(self, batch):

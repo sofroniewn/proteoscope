@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from enum import Enum, auto
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Union
 
 
 @dataclass
@@ -17,13 +17,38 @@ class VqArgs:
 
 
 @dataclass
-class ModelConfig:
+class CytoselfModelConfig:
     input_shape: Tuple[int]
     emb_shapes: Tuple[Tuple[int]]
     output_shape: Tuple[int]
     fc_output_idx: Tuple[int]
     fc_input_type: str
     num_class: Optional[int]
+    vq_coeff: int
+    fc_coeff: int
+
+
+@dataclass
+class UNetConfig:
+    dim: int
+    cond_dim: int
+    dim_mults: Tuple[int]
+    num_resnet_blocks: Tuple[int]
+    layer_attns: Tuple[bool]
+    layer_cross_attns: Tuple[bool]
+    cond_images_channels: int
+    channels: int
+
+
+@dataclass
+class ProteoscopeModelConfig:
+    unet1: UNetConfig
+    unet2: UNetConfig
+    image_sizes: Tuple[int]
+    timesteps: int
+    cond_drop_prob: float
+    channels: int
+    text_embed_dim: int
 
 
 @dataclass
@@ -39,10 +64,9 @@ class OptimizerConfig:
 
 @dataclass
 class ModuleConfig:
-    model: ModelConfig
+    model: Union[CytoselfModelConfig, ProteoscopeModelConfig]
     optimizer: OptimizerConfig
-    vq_coeff: int
-    fc_coeff: int
+    unet_number: Optional[int]
 
 
 @dataclass
