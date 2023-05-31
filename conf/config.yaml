@@ -8,6 +8,6 @@ hydra:
   run:
     dir: /home/ec2-user/outputs-proteoscope/${now:%Y-%m-%d}/${now:%H-%M-%S}
 
-chkpt: null # /home/ec2-user/outputs-proteoscope/2023-05-30/05-34-06/checkpoints/last.ckpt # null
+chkpt: /home/ec2-user/outputs-proteoscope/2023-05-30/21-53-37/checkpoints/last.ckpt # null
 module:
-  unet_number: 1
+  unet_number: 2
