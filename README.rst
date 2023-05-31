@@ -2,7 +2,7 @@
 proteoscope
 ===========
 
-* Exploratory project, under development *
+*Exploratory project, under development*
 
 Protein sequence to image
 
