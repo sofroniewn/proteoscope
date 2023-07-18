@@ -17,10 +17,17 @@ class VqArgs:
 
 
 @dataclass
+class FcArgs:
+    num_layers: int
+
+
+@dataclass
 class CytoselfModelConfig:
     input_shape: Tuple[int]
     emb_shapes: Tuple[Tuple[int]]
     output_shape: Tuple[int]
+    vq_args: VqArgs
+    fc_args: FcArgs
     fc_output_idx: Tuple[int]
     fc_input_type: str
     num_class: Optional[int]

@@ -2,9 +2,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Union
 
-import numpy as np
 import pandas as pd
-import torch
 import zarr
 from anndata import read_h5ad  # type: ignore
 from pytorch_lightning import LightningDataModule
@@ -37,6 +35,7 @@ class ProteoscopeDataModule(LightningDataModule):
         self.images = zarr.open(self.images_path, mode="r")
         self.labels = pd.read_csv(self.labels_path, index_col=0)
         self.labels = self.labels.fillna('')
+        # self.labels['full_index'] = range(len(self.labels))
 
         if self.sequences_path is not None:
             self.sequences = zarr.open(self.sequences_path, 'r')

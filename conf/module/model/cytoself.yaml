@@ -3,8 +3,10 @@ emb_shapes: [[25, 25], [4, 4]]
 output_shape: [2, 100, 100]
 fc_output_idx: [2]
 vq_args:
-  num_embeddings: 512
+  num_embeddings: 2048
   embedding_dim: 64
+fc_args:
+  num_layers: 2
 fc_input_type: 'vqvec'
 num_class: null
 vq_coeff: 1.0

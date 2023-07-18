@@ -8,7 +8,7 @@ from .config import ProteoscopeConfig
 from .proteoscopemodule import ProteoscopeLightningModule
 
 
-def train(config: ProteoscopeConfig) -> None:
+def train_proteoscope(config: ProteoscopeConfig) -> None:
 
     pdm = ProteoscopeDataModule(
         images_path=config.data.images_path,

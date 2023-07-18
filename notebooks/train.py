@@ -1,6 +1,6 @@
 import hydra
 from hydra.core.config_store import ConfigStore
-from proteoscope import ProteoscopeConfig, train
+from proteoscope import ProteoscopeConfig, train_cytoself, train_proteoscope
 
 
 cs = ConfigStore.instance()
@@ -15,7 +15,7 @@ def main(config: ProteoscopeConfig) -> None:
     import os
 
     print("Working directory : {}".format(os.getcwd()))
-    train(config)
+    train_cytoself(config)
 
 
 if __name__ == "__main__":

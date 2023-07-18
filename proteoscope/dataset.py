@@ -1,6 +1,7 @@
 from typing import Dict, Optional, Sequence, Union
 
 import torch
+import numpy as np
 from torch import Tensor
 from torch.utils.data import Dataset
 from torchvision import transforms
@@ -52,6 +53,8 @@ class ProteoscopeDataset(Dataset):
 
     def __getitem__(self, idx: int) -> Dict[str, Union[Tensor, int, str]]:
         row = self.labels.iloc[idx]
+        # index = int(torch.randint(0, len(self.images), (1,))) # shuffle
+        # index = row['full_index']
         index = row.name
         images = self.images[index, :, :, :2]
         images = self.transform(images)
@@ -71,6 +74,7 @@ class ProteoscopeDataset(Dataset):
         item["truncation"] = row['truncation']
         item["label"] = row.label
         item["image"] = images.float()
+        item["localization"] = row['localization']
 
         if self.sequences is not None:
             if self.sequence_index is not None:

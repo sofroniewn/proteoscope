@@ -71,17 +71,17 @@ df.loc[train_proteins, 'label'] = unqiue_indices
 
 df.to_csv(join(datapath, "labels.csv"))
 
-# Convert images to zarr
-shape = (len(df), 100, 100, 4)
-chunks = (1, None, None, 2)
-zarr_path = join(datapath, "images.zarr")
+# # Convert images to zarr
+# shape = (len(df), 100, 100, 4)
+# chunks = (1, None, None, 2)
+# zarr_path = join(datapath, "images.zarr")
 
-z = zarr.open(zarr_path, mode="a", shape=shape, chunks=chunks)
+# z = zarr.open(zarr_path, mode="a", shape=shape, chunks=chunks)
 
-start = 0
-for file in tqdm(images):
-    data = np.load(file)
-    stop = start + len(data)
-    z[start:stop] = data
-    os.remove(file)  # remove npy files as very large
-    start = stop
+# start = 0
+# for file in tqdm(images):
+#     data = np.load(file)
+#     stop = start + len(data)
+#     z[start:stop] = data
+#     os.remove(file)  # remove npy files as very large
+#     start = stop

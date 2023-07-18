@@ -8,7 +8,7 @@ from .config import ProteoscopeConfig
 from .cytoselfmodule import CytoselfLightningModule
 
 
-def train(config: ProteoscopeConfig) -> None:
+def train_cytoself(config: ProteoscopeConfig) -> None:
 
     pdm = ProteoscopeDataModule(
         images_path=config.data.images_path,
