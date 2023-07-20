@@ -19,7 +19,8 @@ class CytoselfLightningModule(LightningModule):
         self.image_variance = image_variance
 
         model_args = module_config.model
-        model_args['num_class'] = num_class
+        if num_class is not None:
+            model_args['num_class'] = num_class
         # Conversion needed due to https://github.com/royerlab/cytoself/blob/9f482391a8e7101fde007184f321471cb983d94e/cytoself/trainer/autoencoder/cytoselffull.py#L382
         model_args = OmegaConf.to_container(model_args)
         del model_args['vq_coeff']

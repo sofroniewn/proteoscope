@@ -50,13 +50,16 @@ class UNetConfig:
 @dataclass
 class ProteoscopeModelConfig:
     unet1: UNetConfig
-    unet2: UNetConfig
+    unet2: Optional[UNetConfig]
+    cytoself: Optional[CytoselfModelConfig]
+    cytoself_checkpoint: Optional[str]
+    cytoself_layer: Optional[str]
     image_sizes: Tuple[int]
     timesteps: int
     cond_drop_prob: float
     channels: int
     text_embed_dim: int
-
+    latent_sizes: Optional[Tuple[int]]
 
 @dataclass
 class OptimizerConfig:
@@ -95,3 +98,4 @@ class ProteoscopeConfig:
     data: DataConfig
     module: ModuleConfig
     trainer: TrainerConfig
+    model_type: str

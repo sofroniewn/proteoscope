@@ -66,6 +66,7 @@ class ProteoscopeDataModule(LightningDataModule):
             split_protein="val",
             split_images="",
             transform=None,
+            unique_protein=True,
         )
 
         self.num_class = self.train_dataset.num_label_class
@@ -79,7 +80,7 @@ class ProteoscopeDataModule(LightningDataModule):
             pin_memory=True,
         )
 
-    def val_dataloader(self, novel_proteins=False, shuffle=False):
+    def val_dataloader(self, novel_proteins=True, shuffle=True):
         if novel_proteins:
             dataset = self.val_proteins_dataset
         else:

@@ -16,6 +16,7 @@ class ProteoscopeDataset(Dataset):
         split_images: str = "",
         sequences = None,
         sequence_index = None,
+        unique_protein = False,
         transform: Optional[Sequence] = (
             transforms.RandomApply(
                 [
@@ -37,6 +38,9 @@ class ProteoscopeDataset(Dataset):
             (labels["split_protein"] == self.split_protein)
             & (labels["split_images"] == self.split_images)
         ]
+        if unique_protein:
+            self.labels = self.labels.drop_duplicates(subset='ensg')
+
         self.num_label_class = len(self.labels['label'].unique())
 
         self.images = images

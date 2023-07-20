@@ -4,8 +4,9 @@ import torch.optim as optim
 from pytorch_lightning import LightningModule
 
 from imagen_pytorch import Unet, Imagen
-from .utils import CosineWarmupScheduler
+# from .utils import CosineWarmupScheduler
 from omegaconf import OmegaConf
+from .cytoselfmodule import CytoselfLightningModule
 
 
 class ProteoscopeLightningModule(LightningModule):
@@ -17,14 +18,12 @@ class ProteoscopeLightningModule(LightningModule):
 
         self.unet_number = module_config.unet_number
         unet1_args = OmegaConf.to_container(module_config.model.unet1)
-        unet2_args = OmegaConf.to_container(module_config.model.unet2)
 
         unet1 = Unet(**unet1_args)
-        unet2 = Unet(**unet2_args)
 
         self.model = Imagen(
-            unets = (unet1, unet2),
-            image_sizes = tuple(module_config.model.image_sizes),
+            unets = (unet1,),
+            image_sizes = (module_config.model.latent_size,),
             timesteps = module_config.model.timesteps,
             cond_drop_prob = module_config.model.cond_drop_prob,
             channels=module_config.model.channels,
@@ -33,13 +32,25 @@ class ProteoscopeLightningModule(LightningModule):
 
         self.optim_config = module_config.optimizer
 
+        self.cytoself_layer = module_config.model.cytoself_layer
+        cytoself_checkpoint = module_config.model.cytoself_checkpoint
+        module_config.model = module_config.model.cytoself
+        clm = CytoselfLightningModule.load_from_checkpoint(
+            cytoself_checkpoint,
+            module_config=module_config,
+            num_class=None,
+        )
+        self.cytoself_model = clm.model
+        self.cytoself_model.eval()
+
     def forward(self, batch):
         return self.model.forward(batch)
 
     def training_step(self, batch, batch_idx, dataloader_idx=0):
         seq_embeds = batch['sequence_embed']
         seq_mask = batch['sequence_mask']
-        images = batch['image'][:, 0, :, :].unsqueeze(dim=1)
+        with torch.no_grad():
+            images = self.cytoself_model(batch['image'].to('cuda'), self.cytoself_layer).float()
         cond_images = batch['image'][:, 1, :, :].unsqueeze(dim=1)
 
         loss = self.model(images, text_embeds = seq_embeds, text_masks=seq_mask, cond_images = cond_images, unet_number = self.unet_number)
@@ -52,7 +63,8 @@ class ProteoscopeLightningModule(LightningModule):
     def validation_step(self, batch, batch_idx, dataloader_idx=0):
         seq_embeds = batch['sequence_embed']
         seq_mask = batch['sequence_mask']
-        images = batch['image'][:, 0, :, :].unsqueeze(dim=1)
+        with torch.no_grad():
+            images = self.cytoself_model(batch['image'].to('cuda'), self.cytoself_layer).float()
         cond_images = batch['image'][:, 1, :, :].unsqueeze(dim=1)
 
         loss = self.model(images, text_embeds = seq_embeds, text_masks=seq_mask, cond_images = cond_images, unet_number = self.unet_number)
@@ -70,13 +82,13 @@ class ProteoscopeLightningModule(LightningModule):
             eps=self.optim_config.eps,
             weight_decay=self.optim_config.weight_decay,
         )
-        self.lr_scheduler = CosineWarmupScheduler(
-            optimizer,
-            warmup=self.optim_config.warmup,
-            max_iters=self.optim_config.max_iters,
-        )
+        # self.lr_scheduler = CosineWarmupScheduler(
+        #     optimizer,
+        #     warmup=self.optim_config.warmup,
+        #     max_iters=self.optim_config.max_iters,
+        # )
         return optimizer
 
-    def optimizer_step(self, *args, **kwargs):
-        super().optimizer_step(*args, **kwargs)
-        self.lr_scheduler.step()  # Step per iteration
+    # def optimizer_step(self, *args, **kwargs):
+    #     super().optimizer_step(*args, **kwargs)
+    #     self.lr_scheduler.step()  # Step per iteration

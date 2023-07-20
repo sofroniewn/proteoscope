@@ -1,13 +1,14 @@
 defaults:
   - data: data
   - module/optimizer: adamw
-  - module/model: cytoself
+  - module/model: proteoscope
   - trainer: cuda
 
 hydra:
   run:
     dir: /home/ec2-user/outputs-proteoscope/${now:%Y-%m-%d}/${now:%H-%M-%S}
 
-chkpt: null # /home/ec2-user/outputs-proteoscope/2023-07-10/19-49-35/checkpoints/last.ckpt # null
+model_type: proteoscope
+chkpt: null # /home/ec2-user/outputs-proteoscope/2023-07-19/16-42-34/checkpoints/last.ckpt # null
 module:
-  unet_number: 2
+  unet_number: 1

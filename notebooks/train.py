@@ -15,8 +15,12 @@ def main(config: ProteoscopeConfig) -> None:
     import os
 
     print("Working directory : {}".format(os.getcwd()))
-    train_cytoself(config)
-
+    if config.model_type == 'proteoscope':
+        train_proteoscope(config)
+    elif config.model_type == 'cytoself':
+        train_cytoself(config)
+    else:
+        raise ValueError(f'Unrecognized model type {config.model_type}')
 
 if __name__ == "__main__":
     main()
