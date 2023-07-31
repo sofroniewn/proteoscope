@@ -17,17 +17,22 @@ class ProteoscopeLightningModule(LightningModule):
         super(ProteoscopeLightningModule, self).__init__()
 
         self.unet_number = module_config.unet_number
+        self.cond_images = module_config.model.unet1.cond_images_channels > 0
+
         unet1_args = OmegaConf.to_container(module_config.model.unet1)
 
         unet1 = Unet(**unet1_args)
 
-        self.model = Imagen(
+        self.imagen = Imagen(
+            # condition_on_text = False, ###
             unets = (unet1,),
             image_sizes = (module_config.model.latent_size,),
             timesteps = module_config.model.timesteps,
             cond_drop_prob = module_config.model.cond_drop_prob,
-            channels=module_config.model.channels,
+            channels = module_config.model.channels,
             text_embed_dim=module_config.model.text_embed_dim,
+            auto_normalize_img = False,
+            dynamic_thresholding = False,
         )
 
         self.optim_config = module_config.optimizer
@@ -42,38 +47,50 @@ class ProteoscopeLightningModule(LightningModule):
         )
         self.cytoself_model = clm.model
         self.cytoself_model.eval()
+        self.cytoself_model.to(self.imagen.device)
 
     def forward(self, batch):
-        return self.model.forward(batch)
-
-    def training_step(self, batch, batch_idx, dataloader_idx=0):
         seq_embeds = batch['sequence_embed']
         seq_mask = batch['sequence_mask']
-        with torch.no_grad():
-            images = self.cytoself_model(batch['image'].to('cuda'), self.cytoself_layer).float()
-        cond_images = batch['image'][:, 1, :, :].unsqueeze(dim=1)
+        if self.cond_images:
+            cond_images = batch['image'][:, 1, :, :].unsqueeze(dim=1)
+        else:
+            cond_images = None
 
-        loss = self.model(images, text_embeds = seq_embeds, text_masks=seq_mask, cond_images = cond_images, unet_number = self.unet_number)
+        with torch.no_grad():
+            latents = self.cytoself_model(batch['image'], self.cytoself_layer).float()
+       
+        return self.imagen.forward(latents, text_embeds = seq_embeds, text_masks=seq_mask, cond_images = cond_images, unet_number = self.unet_number)
+        # return self.imagen.forward(latents, text_embeds = None, text_masks=None, cond_images = None, unet_number = self.unet_number)
+
+    def training_step(self, batch, batch_idx, dataloader_idx=0):
+        loss = self(batch)
         self.log(
             "train_loss", loss, on_step=True, on_epoch=False, prog_bar=True, logger=True
         )
-
         return loss
 
     def validation_step(self, batch, batch_idx, dataloader_idx=0):
-        seq_embeds = batch['sequence_embed']
-        seq_mask = batch['sequence_mask']
-        with torch.no_grad():
-            images = self.cytoself_model(batch['image'].to('cuda'), self.cytoself_layer).float()
-        cond_images = batch['image'][:, 1, :, :].unsqueeze(dim=1)
-
-        loss = self.model(images, text_embeds = seq_embeds, text_masks=seq_mask, cond_images = cond_images, unet_number = self.unet_number)
+        loss = self(batch)
         self.log(
             "val_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True
             )
 
+    def sample(self, batch, cond_scale=1.0, cond_images=None):
+        seq_embeds = batch['sequence_embed'].to(self.imagen.device)
+        seq_mask = batch['sequence_mask'].to(self.imagen.device)
+        
+        if cond_images is None and self.cond_images:
+            cond_images = batch['image'][:, 1, :, :].unsqueeze(dim=1)
+
+        if cond_images is not None:
+            cond_images.to(self.imagen.device)
+
+        return self.imagen.sample(text_embeds=seq_embeds, text_masks=seq_mask, cond_images=cond_images, cond_scale=cond_scale)
+        # return self.imagen.sample(text_embeds=None, text_masks=None, cond_images=None, cond_scale=cond_scale)
+
     def configure_optimizers(self):
-        params = self.model.parameters()
+        params = self.imagen.parameters()
 
         optimizer = optim.AdamW(
             params,

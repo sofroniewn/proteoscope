@@ -4,8 +4,7 @@ import torch.optim as optim
 from pytorch_lightning import LightningModule
 from omegaconf import OmegaConf
 
-from cytoself.trainer.autoencoder.cytoselffull import CytoselfFull
-
+from cytoself.trainer.autoencoder.cytoselffull import CytoselfFull, default_block_args
 
 
 class CytoselfLightningModule(LightningModule):
@@ -26,6 +25,7 @@ class CytoselfLightningModule(LightningModule):
         del model_args['vq_coeff']
         del model_args['fc_coeff']
 
+        # model_args['encoder_args'] = [{}] #default_block_args[:len(model_args['emb_shapes'])]
         self.model = CytoselfFull(**model_args)
 
         self.optim_config = module_config.optimizer

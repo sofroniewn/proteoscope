@@ -88,6 +88,9 @@ class ProteoscopeDataset(Dataset):
                 sequence_embed = self.sequences[item["seq_embedding_index"], 1:]
                 sequence_mask = torch.zeros(len(sequence_embed), dtype=torch.bool)
                 sequence_mask[:row['truncation']] = True
-            item['sequence_embed'] = sequence_embed
-            item['sequence_mask'] = sequence_mask
+            # item['sequence_embed'] = sequence_embed
+            # item['sequence_mask'] = sequence_mask
+            item['sequence_embed'] = sequence_embed.mean(axis=0)[None, ...]
+            # item['sequence_embed'] = torch.randn((1, 1280))
+            item['sequence_mask'] = torch.ones(1, dtype=torch.bool)
         return item
