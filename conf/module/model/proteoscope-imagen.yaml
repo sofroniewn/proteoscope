@@ -1,0 +1,23 @@
+unet1:
+  dim: 128
+  cond_dim: 128
+  dim_mults: [1, 2, 4]
+  num_resnet_blocks: 3
+  layer_attns: [False, True, True]
+  layer_cross_attns: [False, True, True]
+  cond_images_channels: 1
+  channels: 1
+unet2:
+  dim: 128
+  cond_dim: 128
+  dim_mults: [1, 2, 4]
+  num_resnet_blocks: [2, 4, 8]
+  layer_attns: [False, False, True]
+  layer_cross_attns: [False, False, True]
+  cond_images_channels: 1
+  channels: 1
+image_sizes: [32, 100]
+timesteps: 100
+cond_drop_prob: 0.1
+channels: 1
+text_embed_dim: 1280
