@@ -9,6 +9,6 @@ hydra:
     dir: /home/ec2-user/outputs-proteoscope/${now:%Y-%m-%d}/${now:%H-%M-%S}
 
 model_type: proteoscope
-chkpt: null #/home/ec2-user/outputs-proteoscope/2023-08-04/16-10-35/checkpoints/last.ckpt # null
+chkpt: /home/ec2-user/outputs-proteoscope/2023-08-04/22-36-50/checkpoints/last.ckpt # null
 module:
   unet_number: 1

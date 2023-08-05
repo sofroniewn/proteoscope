@@ -18,27 +18,45 @@ class ProteoscopeLightningModule(LightningModule):
         module_config,
     ):
         super(ProteoscopeLightningModule, self).__init__()
-
+        # HERE!!!! - in channels 64 vs 192
+        # self.unet = UNet2DConditionModel(
+        #     sample_size=25,  # the target image resolution
+        #     in_channels=192,  # the number of input channels, 3 for RGB images
+        #     out_channels=64,  # the number of output channels
+        #     layers_per_block=2,  # how many ResNet layers to use per UNet block
+        #     block_out_channels=(512,), #(256, 512, 512),  # the number of output channels for each UNet block
+        #     down_block_types=(
+        #         "CrossAttnDownBlock2D",
+        #         #"CrossAttnUpBlock2D",  # a ResNet downsampling block with spatial self-attention
+        #         #"DownBlock2D",
+        #     ),
+        #     up_block_types=(
+        #         "UpBlock2D",  # a regular ResNet upsampling block
+        #         #"CrossAttnUpBlock2D",  # a ResNet upsampling block with spatial self-attention
+        #         #"CrossAttnUpBlock2D",
+        #     ),
+        #     cross_attention_dim=1280,
+        # )
         self.unet = UNet2DConditionModel(
-            sample_size=25,  # the target image resolution
-            in_channels=192,  # the number of input channels, 3 for RGB images
+            sample_size=4,  # the target image resolution
+            in_channels=64,  # the number of input channels, 3 for RGB images
             out_channels=64,  # the number of output channels
             layers_per_block=2,  # how many ResNet layers to use per UNet block
-            block_out_channels=(512,), #(256, 512, 512),  # the number of output channels for each UNet block
+            block_out_channels=(256, 512, 512),  # the number of output channels for each UNet block
             down_block_types=(
                 "CrossAttnDownBlock2D",
-                #"CrossAttnUpBlock2D",  # a ResNet downsampling block with spatial self-attention
-                #"DownBlock2D",
+                "AttnDownBlock2D", #BAD # a ResNet downsampling block with spatial self-attention
+                "DownBlock2D",
             ),
             up_block_types=(
                 "UpBlock2D",  # a regular ResNet upsampling block
-                #"CrossAttnUpBlock2D",  # a ResNet upsampling block with spatial self-attention
-                #"CrossAttnUpBlock2D",
+                "CrossAttnUpBlock2D",  # a ResNet upsampling block with spatial self-attention
+                "CrossAttnUpBlock2D",
             ),
             cross_attention_dim=1280,
         )
-
-        self.cond_images = True
+        # HERE TOOO
+        self.cond_images = False #True
 
         self.noise_scheduler = DDPMScheduler(num_train_timesteps=100)
 
@@ -56,7 +74,8 @@ class ProteoscopeLightningModule(LightningModule):
         self.cytoself_model.eval()
         self.cytoself_model.to(self.unet.device)
 
-        self.latents_shape = (64, 25, 25)
+        # HERE TOOO
+        self.latents_shape = (64, 4, 4) #(64, 25, 25)
         self.latents_init_scale = 5.0
         self.unconditioned_probability = 0.2
 
@@ -128,12 +147,13 @@ class ProteoscopeLightningModule(LightningModule):
         # Initialize latents
         latents = torch.randn(latents_shape).to(self.unet.device)
 
-        with torch.no_grad():
-            latents_low = self.cytoself_model(batch['image'], 'vqvec2').float() / self.latents_init_scale
-            latents_cond = self.cytoself_model(cond_images, 'vqvec1').float() / self.latents_init_scale
-            latents_low = resize(latents_low, latents.shape[-2:])
-            latents_low = torch.cat([latents_low] * 2)
-            latents_cond = torch.cat([latents_cond] * 2)
+        # HERE!!!!
+        # with torch.no_grad():
+        #     latents_low = self.cytoself_model(batch['image'], 'vqvec2').float() / self.latents_init_scale
+        #     latents_cond = self.cytoself_model(cond_images, 'vqvec1').float() / self.latents_init_scale
+        #     latents_low = resize(latents_low, latents.shape[-2:])
+        #     latents_low = torch.cat([latents_low] * 2)
+        #     latents_cond = torch.cat([latents_cond] * 2)
 
         # set step values
         if num_inference_steps is None:
@@ -148,7 +168,8 @@ class ProteoscopeLightningModule(LightningModule):
             latent_model_input = torch.cat([latents] * 2)
             latent_model_input = self.noise_scheduler.scale_model_input(latent_model_input, timestep=t)
 
-            latent_model_input = torch.cat([latent_model_input, latents_low, latents_cond], dim=1)
+            # HERE!!!!
+            # latent_model_input = torch.cat([latent_model_input, latents_low, latents_cond], dim=1)
 
             # predict the noise residual
             with torch.no_grad():
