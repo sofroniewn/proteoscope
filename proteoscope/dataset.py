@@ -79,6 +79,8 @@ class ProteoscopeDataset(Dataset):
         item["label"] = row.label
         item["image"] = images.float()
         item["localization"] = row['localization']
+        item["complex"] = row['complex']
+        item["complex_fig"] = row['complex_fig']
 
         if self.sequences is not None:
             if self.sequence_index is not None:
@@ -90,9 +92,9 @@ class ProteoscopeDataset(Dataset):
                 sequence_mask[:row['truncation']] = True
             # item['sequence_embed'] = sequence_embed
             # item['sequence_mask'] = sequence_mask
-            # item['sequence_embed'] = sequence_embed.mean(axis=0)[None, ...]
+            item['sequence_embed'] = sequence_embed.mean(axis=0)[None, ...]
             # item['sequence_embed'] = torch.randn((1, 1280))
-            item['sequence_embed'] = torch.zeros((1, 1280))
-            item['sequence_embed'][0, item["label"]] = 1.0
+            # item['sequence_embed'] = torch.zeros((1, 1280))
+            # item['sequence_embed'][0, item["label"]] = 1.0
             item['sequence_mask'] = torch.ones(1, dtype=torch.bool)
         return item

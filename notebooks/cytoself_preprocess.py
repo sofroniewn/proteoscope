@@ -71,6 +71,31 @@ df.loc[train_proteins, 'label'] = unqiue_indices
 
 df.to_csv(join(datapath, "labels.csv"))
 
+
+# label_path = '/home/ec2-user/cytoself-data/41592_2022_1541_MOESM4_ESM.csv'
+# df = pd.read_csv(label_path)
+# df.drop_duplicates(subset='gene_name', keep='first', inplace=True)
+# df.set_index('gene_name', inplace=True)
+# labels = pd.read_csv('/home/ec2-user/cytoself-data/labels.csv', index_col=0)
+# labels['localization'] = labels['name'].map(df['localization'])
+# labels['localization'].unique()
+
+# label_path = '/home/ec2-user/cytoself-data/41592_2022_1541_MOESM5_ESM.csv'
+# df = pd.read_csv(label_path)
+# df.drop_duplicates(subset='gene_name', keep='first', inplace=True)
+# df.set_index('gene_name', inplace=True)
+# labels = pd.read_csv('/home/ec2-user/cytoself-data/labels.csv', index_col=0)
+# labels['complex'] = labels['name'].map(df['complex_name'])
+# labels['complex'].unique()
+
+# label_path = '/home/ec2-user/cytoself-data/41592_2022_1541_MOESM7_ESM.csv'
+# df = pd.read_csv(label_path)
+# df.drop_duplicates(subset='gene_name', keep='first', inplace=True)
+# df.set_index('gene_name', inplace=True)
+# labels = pd.read_csv('/home/ec2-user/cytoself-data/labels.csv', index_col=0)
+# labels['complex_fig'] = labels['name'].map(df['complex_name'])
+# labels['complex_fig'].unique()
+
 # # Convert images to zarr
 # shape = (len(df), 100, 100, 4)
 # chunks = (1, None, None, 2)
