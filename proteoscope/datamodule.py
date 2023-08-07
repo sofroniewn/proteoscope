@@ -65,7 +65,7 @@ class ProteoscopeDataModule(LightningDataModule):
             split_protein="val",
             split_images="",
             transform=None,
-            unique_protein=True,
+            unique_protein=False,
         )
 
         self.num_class = self.train_dataset.num_label_class
