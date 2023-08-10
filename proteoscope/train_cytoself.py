@@ -5,7 +5,8 @@ from pytorch_lightning.loggers import TensorBoardLogger
 
 from .datamodule import ProteoscopeDataModule
 from .config import ProteoscopeConfig
-from .cytoselfmodule import CytoselfLightningModule
+# from .cytoselfmodule import CytoselfLightningModule
+from .autoencoder import AutoencoderLightningModule
 
 
 def train_cytoself(config: ProteoscopeConfig) -> None:
@@ -13,12 +14,13 @@ def train_cytoself(config: ProteoscopeConfig) -> None:
     pdm = ProteoscopeDataModule(
         images_path=config.data.images_path,
         labels_path=config.data.labels_path,
+        trim=config.data.trim,
         batch_size=config.trainer.batch_size,
         num_workers=config.trainer.num_workers,
     )
     pdm.setup()
 
-    clm = CytoselfLightningModule(
+    clm = AutoencoderLightningModule(
         module_config=config.module,
         num_class=pdm.num_class,
     )
@@ -54,4 +56,4 @@ def train_cytoself(config: ProteoscopeConfig) -> None:
         gradient_clip_val=config.trainer.gradient_clip_val,
         deterministic=False,
     )
-    trainer.fit(clm, pdm)
+    trainer.fit(clm, train_dataloaders=pdm.train_dataloader(), val_dataloaders=pdm.val_dataloader(novel_proteins=False))

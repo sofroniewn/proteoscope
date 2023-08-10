@@ -13,6 +13,7 @@ def train_proteoscope(config: ProteoscopeConfig) -> None:
     pdm = ProteoscopeDataModule(
         images_path=config.data.images_path,
         labels_path=config.data.labels_path,
+        trim=config.data.trim,
         sequences_path=config.data.sequences_path,
         batch_size=config.trainer.batch_size,
         num_workers=config.trainer.num_workers,
@@ -54,4 +55,4 @@ def train_proteoscope(config: ProteoscopeConfig) -> None:
         gradient_clip_val=config.trainer.gradient_clip_val,
         deterministic=False,
     )
-    trainer.fit(clm, pdm)
+    trainer.fit(clm, train_dataloaders=pdm.train_dataloader(), val_dataloaders=pdm.val_dataloader(novel_proteins=True))

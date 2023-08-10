@@ -1,20 +1,15 @@
 import torch
+import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
+from torchvision.transforms.functional import resize
 from pytorch_lightning import LightningModule
 from tqdm.auto import tqdm
 
 from diffusers import DDPMScheduler, UNet2DConditionModel
 from diffusers.optimization import get_cosine_schedule_with_warmup
 
-from .autoencoder import AutoencoderLightningModule
-
-
-def combine_images(img_set1, img_set2):
-    n = img_set1.shape[0]
-    row1 = torch.cat(img_set1.chunk(n, dim=0), dim=2).squeeze(0)
-    row2 = torch.cat(img_set2.chunk(n, dim=0), dim=2).squeeze(0)
-    return torch.cat([row1, row2], dim=0)
+from .cytoselfmodule import CytoselfLightningModule
 
 
 class ProteoscopeLightningModule(LightningModule):
@@ -23,15 +18,34 @@ class ProteoscopeLightningModule(LightningModule):
         module_config,
     ):
         super(ProteoscopeLightningModule, self).__init__()
+        # HERE!!!! - in channels 64 vs 192
+        # self.unet = UNet2DConditionModel(
+        #     sample_size=25,  # the target image resolution
+        #     in_channels=192,  # the number of input channels, 3 for RGB images
+        #     out_channels=64,  # the number of output channels
+        #     layers_per_block=2,  # how many ResNet layers to use per UNet block
+        #     block_out_channels=(512,), #(256, 512, 512),  # the number of output channels for each UNet block
+        #     down_block_types=(
+        #         "CrossAttnDownBlock2D",
+        #         #"CrossAttnUpBlock2D",  # a ResNet downsampling block with spatial self-attention
+        #         #"DownBlock2D",
+        #     ),
+        #     up_block_types=(
+        #         "UpBlock2D",  # a regular ResNet upsampling block
+        #         #"CrossAttnUpBlock2D",  # a ResNet upsampling block with spatial self-attention
+        #         #"CrossAttnUpBlock2D",
+        #     ),
+        #     cross_attention_dim=1280,
+        # )
         self.unet = UNet2DConditionModel(
-            sample_size=12,  # the target image resolution
-            in_channels=2*16,  # the number of input channels, 3 for RGB images
-            out_channels=16,  # the number of output channels
+            sample_size=4,  # the target image resolution
+            in_channels=64,  # the number of input channels, 3 for RGB images
+            out_channels=64,  # the number of output channels
             layers_per_block=2,  # how many ResNet layers to use per UNet block
             block_out_channels=(256, 512, 512),  # the number of output channels for each UNet block
             down_block_types=(
                 "CrossAttnDownBlock2D",
-                "CrossAttnDownBlock2D", #BAD # a ResNet downsampling block with spatial self-attention
+                "AttnDownBlock2D", #BAD # a ResNet downsampling block with spatial self-attention
                 "DownBlock2D",
             ),
             up_block_types=(
@@ -41,8 +55,8 @@ class ProteoscopeLightningModule(LightningModule):
             ),
             cross_attention_dim=1280,
         )
-
-        self.cond_images = True
+        # HERE TOOO
+        self.cond_images = False #True
 
         self.noise_scheduler = DDPMScheduler(num_train_timesteps=100)
 
@@ -51,19 +65,19 @@ class ProteoscopeLightningModule(LightningModule):
         self.cytoself_layer = module_config.model.cytoself_layer
         cytoself_checkpoint = module_config.model.cytoself_checkpoint
         module_config.model = module_config.model.cytoself
-        clm = AutoencoderLightningModule.load_from_checkpoint(
+        clm = CytoselfLightningModule.load_from_checkpoint(
             cytoself_checkpoint,
             module_config=module_config,
-            num_class=1049,
+            num_class=None,
         )
-        self.autoencoder = clm.vae
-        self.autoencoder.eval()
-        self.autoencoder.to(self.unet.device)
+        self.cytoself_model = clm.model
+        self.cytoself_model.eval()
+        self.cytoself_model.to(self.unet.device)
 
-        self.latents_shape = (16, 12, 12)
+        # HERE TOOO
+        self.latents_shape = (64, 4, 4) #(64, 25, 25)
         self.latents_init_scale = 5.0
         self.unconditioned_probability = 0.2
-        self.guidance_scale = 3.0
 
     def forward(self, batch):
         seq_embeds = batch['sequence_embed']
@@ -79,11 +93,10 @@ class ProteoscopeLightningModule(LightningModule):
             cond_images = None
 
         with torch.no_grad():
-            latents = self.autoencoder.encode(batch['image']).latent_dist.mean / self.latents_init_scale
-            if cond_images is not None:
-                latents_cond = self.autoencoder.encode(cond_images).latent_dist.mean / self.latents_init_scale
-            else:
-                latents_cond = None
+            latents = self.cytoself_model(batch['image'], 'vqvec1').float() / self.latents_init_scale
+            latents_cond = self.cytoself_model(cond_images, 'vqvec1').float() / self.latents_init_scale
+            latents_low = self.cytoself_model(batch['image'], 'vqvec2').float() / self.latents_init_scale
+            latents_low = resize(latents_low, latents.shape[-2:])
 
         # Sample noise to add to the latents
         noise = torch.randn(latents.shape).to(latents)
@@ -97,11 +110,8 @@ class ProteoscopeLightningModule(LightningModule):
         noisy_latents = self.noise_scheduler.add_noise(latents, noise, timesteps)
 
         # Predict the noise residual
-        if latents_cond is not None:
-            model_input = torch.cat([noisy_latents, latents_cond], dim=1)
-        else:
-            model_input = noisy_latents
-        
+        model_input = torch.cat([noisy_latents, latents_low, latents_cond], dim=1)
+        # model_input = noisy_latents
         noise_pred = self.unet(model_input, timesteps, encoder_hidden_states=seq_embeds, encoder_attention_mask=seq_mask, return_dict=False)[0]
         loss = F.mse_loss(noise_pred, noise)
 
@@ -118,39 +128,6 @@ class ProteoscopeLightningModule(LightningModule):
         loss = self(batch)
         self.log(
             "val_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True
-            )
-        
-        return batch['image'][0].unsqueeze_(0), batch['sequence_embed'][0].unsqueeze_(0), batch['sequence_mask'][0].unsqueeze_(0)
-
-    def validation_epoch_end(self, results):
-        images = torch.cat([r[0] for r in results[:16:2]])
-        seq_emb = torch.cat([r[1] for r in results[:16:2]])
-        seq_mask = torch.cat([r[2] for r in results[:16:2]])
-        batch = {}
-        batch['image'] = images
-        batch['sequence_embed'] = seq_emb
-        batch['sequence_mask'] = seq_mask
-
-        output_latents = self.sample(batch, guidance_scale=self.guidance_scale)
-        output_images = self.autoencoder.decode(output_latents).sample
-
-        pro = combine_images(images[:, 0], output_images[:, 0])
-        nuc = combine_images(images[:, 1], output_images[:, 1])
-
-        if self.global_step > 0:
-            tensorboard_logger = self.logger.experiment
-            tensorboard_logger.add_image(
-                "pro",
-                pro,
-                self.global_step,
-                dataformats="HW",
-            )
-
-            tensorboard_logger.add_image(
-                "nuc",
-                nuc,
-                self.global_step,
-                dataformats="HW",
             )
 
     def sample(self, batch, guidance_scale=1.0, cond_images=None, num_inference_steps=None):
@@ -170,12 +147,13 @@ class ProteoscopeLightningModule(LightningModule):
         # Initialize latents
         latents = torch.randn(latents_shape).to(self.unet.device)
 
-        if cond_images is not None:
-            with torch.no_grad():
-                latents_cond = self.autoencoder.encode(cond_images).latent_dist.mean / self.latents_init_scale
-                latents_cond = torch.cat([latents_cond] * 2)
-        else:
-            latents_cond = None
+        # HERE!!!!
+        # with torch.no_grad():
+        #     latents_low = self.cytoself_model(batch['image'], 'vqvec2').float() / self.latents_init_scale
+        #     latents_cond = self.cytoself_model(cond_images, 'vqvec1').float() / self.latents_init_scale
+        #     latents_low = resize(latents_low, latents.shape[-2:])
+        #     latents_low = torch.cat([latents_low] * 2)
+        #     latents_cond = torch.cat([latents_cond] * 2)
 
         # set step values
         if num_inference_steps is None:
@@ -190,8 +168,8 @@ class ProteoscopeLightningModule(LightningModule):
             latent_model_input = torch.cat([latents] * 2)
             latent_model_input = self.noise_scheduler.scale_model_input(latent_model_input, timestep=t)
 
-            if latents_cond is not None:
-                latent_model_input = torch.cat([latent_model_input, latents_cond], dim=1)
+            # HERE!!!!
+            # latent_model_input = torch.cat([latent_model_input, latents_low, latents_cond], dim=1)
 
             # predict the noise residual
             with torch.no_grad():

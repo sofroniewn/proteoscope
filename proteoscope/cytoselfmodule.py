@@ -5,6 +5,7 @@ from pytorch_lightning import LightningModule
 from omegaconf import OmegaConf
 
 from cytoself.trainer.autoencoder.cytoselffull import CytoselfFull, default_block_args
+from diffusers.optimization import get_cosine_schedule_with_warmup
 
 
 class CytoselfLightningModule(LightningModule):
@@ -94,13 +95,14 @@ class CytoselfLightningModule(LightningModule):
             eps=self.optim_config.eps,
             weight_decay=self.optim_config.weight_decay,
         )
-        # self.lr_scheduler = CosineWarmupScheduler(
-        #     optimizer,
-        #     warmup=self.optim_config.warmup,
-        #     max_iters=self.optim_config.max_iters,
-        # )
+        
+        self.lr_scheduler = get_cosine_schedule_with_warmup(
+            optimizer,
+            num_warmup_steps=self.optim_config.warmup,
+            num_training_steps=self.optim_config.max_iters,
+        )
         return optimizer
 
-    # def optimizer_step(self, *args, **kwargs):
-    #     super().optimizer_step(*args, **kwargs)
-    #     self.lr_scheduler.step()  # Step per iteration
+    def optimizer_step(self, *args, **kwargs):
+        super().optimizer_step(*args, **kwargs)
+        self.lr_scheduler.step()  # Step per iteration

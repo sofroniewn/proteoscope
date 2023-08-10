@@ -13,6 +13,7 @@ class ProteoscopeDataset(Dataset):
         images,
         labels,
         split_protein: str,
+        trim: Optional[int] = None,
         split_images: str = "",
         sequences = None,
         sequence_index = None,
@@ -44,6 +45,7 @@ class ProteoscopeDataset(Dataset):
         self.num_label_class = len(self.labels['label'].unique())
 
         self.images = images
+        self.trim = trim
         self.transform = transforms.Compose(
             [torch.from_numpy, lambda x: torch.permute(x, [2, 0, 1])]
             + ([] if transform is None else list(transform))
@@ -57,10 +59,10 @@ class ProteoscopeDataset(Dataset):
 
     def __getitem__(self, idx: int) -> Dict[str, Union[Tensor, int, str]]:
         row = self.labels.iloc[idx]
-        # index = int(torch.randint(0, len(self.images), (1,))) # shuffle
-        # index = row['full_index']
         index = row.name
         images = self.images[index, :, :, :2]
+        if self.trim is not None:
+            images = images[self.trim:-self.trim, self.trim:-self.trim]
         images = self.transform(images)
 
         item = dict()

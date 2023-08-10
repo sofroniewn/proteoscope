@@ -8,6 +8,7 @@ class DataConfig:
     images_path: str
     labels_path: str
     sequences_path: Optional[str]
+    trim: Optional[int]
 
 
 @dataclass
