@@ -2,3 +2,4 @@ images_path: '/home/ec2-user/cytoself-data/images.zarr'
 labels_path: '/home/ec2-user/cytoself-data/labels.csv'
 sequences_path: '/home/ec2-user/cytoself-data/ESM_sequence_embeddings_full.zarr' # null
 trim: 2
+sequence_embedding: 'ESM-full'

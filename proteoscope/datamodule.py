@@ -20,6 +20,7 @@ class ProteoscopeDataModule(LightningDataModule):
         num_workers: int,
         sequences_path: Optional[str] = None,
         trim: Optional[int] = None,
+        sequence_embedding: Optional[str] = None,
     ):
         super().__init__()
 
@@ -29,7 +30,7 @@ class ProteoscopeDataModule(LightningDataModule):
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.trim = trim
-
+        self.sequence_embedding = sequence_embedding
 
     def prepare_data(self):
         pass
@@ -51,6 +52,7 @@ class ProteoscopeDataModule(LightningDataModule):
             split_protein="train",
             split_images="train",
             trim=self.trim,
+            sequence_embedding=self.sequence_embedding,
         )
 
         self.val_images_dataset = ProteoscopeDataset(
@@ -61,6 +63,7 @@ class ProteoscopeDataModule(LightningDataModule):
             split_images="val",
             transform=None,
             trim=self.trim,
+            sequence_embedding=self.sequence_embedding,
         )
 
         self.val_proteins_dataset = ProteoscopeDataset(
@@ -72,8 +75,8 @@ class ProteoscopeDataModule(LightningDataModule):
             transform=None,
             unique_protein=False,
             trim=self.trim,
+            sequence_embedding=self.sequence_embedding,
         )
-
         self.num_class = self.train_dataset.num_label_class
 
     def train_dataloader(self):

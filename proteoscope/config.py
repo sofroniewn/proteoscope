@@ -9,6 +9,7 @@ class DataConfig:
     labels_path: str
     sequences_path: Optional[str]
     trim: Optional[int]
+    sequence_embedding: Optional[str]
 
 
 @dataclass

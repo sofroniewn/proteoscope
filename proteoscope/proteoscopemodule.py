@@ -6,6 +6,7 @@ from tqdm.auto import tqdm
 
 from diffusers import DDPMScheduler, UNet2DConditionModel
 from diffusers.optimization import get_cosine_schedule_with_warmup
+from piqa import SSIM
 
 from .autoencoder import AutoencoderLightningModule
 
@@ -61,9 +62,10 @@ class ProteoscopeLightningModule(LightningModule):
         self.autoencoder.to(self.unet.device)
 
         self.latents_shape = (16, 12, 12)
-        self.latents_init_scale = 5.0
+        self.latents_init_scale = 12.0
         self.unconditioned_probability = 0.2
         self.guidance_scale = 3.0
+        self.ssim = SSIM(n_channels=1)
 
     def forward(self, batch):
         seq_embeds = batch['sequence_embed']
@@ -123,6 +125,9 @@ class ProteoscopeLightningModule(LightningModule):
         return batch['image'][0].unsqueeze_(0), batch['sequence_embed'][0].unsqueeze_(0), batch['sequence_mask'][0].unsqueeze_(0)
 
     def validation_epoch_end(self, results):
+        if len(results) == 0:
+            return
+
         images = torch.cat([r[0] for r in results[:16:2]])
         seq_emb = torch.cat([r[1] for r in results[:16:2]])
         seq_mask = torch.cat([r[2] for r in results[:16:2]])
@@ -137,7 +142,16 @@ class ProteoscopeLightningModule(LightningModule):
         pro = combine_images(images[:, 0], output_images[:, 0])
         nuc = combine_images(images[:, 1], output_images[:, 1])
 
+        ssim_score = {}
+        ssim_score['ssim_pro'] = self.ssim(images[:, 0].unsqueeze_(1), torch.clip(output_images[:, 0].unsqueeze_(1), 0, 1))
+        ssim_score['ssim_nuc'] = self.ssim(images[:, 1].unsqueeze_(1), torch.clip(output_images[:, 1].unsqueeze_(1), 0, 1))
+
         if self.global_step > 0:
+            for key, value in ssim_score.items():
+                self.log(
+                    "val_" + key, value, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True
+                )
+
             tensorboard_logger = self.logger.experiment
             tensorboard_logger.add_image(
                 "pro",

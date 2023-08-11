@@ -18,6 +18,7 @@ class ProteoscopeDataset(Dataset):
         sequences = None,
         sequence_index = None,
         unique_protein = False,
+        sequence_embedding = None,
         transform: Optional[Sequence] = (
             transforms.RandomApply(
                 [
@@ -53,6 +54,7 @@ class ProteoscopeDataset(Dataset):
 
         self.sequences = sequences
         self.sequence_index = sequence_index
+        self.sequence_embedding = sequence_embedding
 
     def __len__(self) -> int:
         return len(self.labels)
@@ -84,7 +86,7 @@ class ProteoscopeDataset(Dataset):
         item["complex"] = row['complex']
         item["complex_fig"] = row['complex_fig']
 
-        if self.sequences is not None:
+        if self.sequences is not None and self.sequence_embedding is not None:
             if self.sequence_index is not None:
                 sequence_embed = self.sequences[item["seq_embedding_index"], self.sequence_index]
                 sequence_mask = None
@@ -92,11 +94,18 @@ class ProteoscopeDataset(Dataset):
                 sequence_embed = self.sequences[item["seq_embedding_index"], 1:]
                 sequence_mask = torch.zeros(len(sequence_embed), dtype=torch.bool)
                 sequence_mask[:row['truncation']] = True
-            # item['sequence_embed'] = sequence_embed
-            # item['sequence_mask'] = sequence_mask
-            item['sequence_embed'] = sequence_embed.mean(axis=0)[None, ...]
-            # item['sequence_embed'] = torch.randn((1, 1280))
-            # item['sequence_embed'] = torch.zeros((1, 1280))
-            # item['sequence_embed'][0, item["label"]] = 1.0
-            item['sequence_mask'] = torch.ones(1, dtype=torch.bool)
+
+            if self.sequence_embedding == 'ESM-mean':
+                item['sequence_embed'] = sequence_embed.mean(axis=0)[None, ...]
+                item['sequence_mask'] = torch.ones(1, dtype=torch.bool)
+            elif self.sequence_embedding == 'one-hot':
+                item['sequence_embed'] = torch.zeros((1, 1280))
+                item['sequence_embed'][0, item["label"]] = 1.0
+                item['sequence_mask'] = torch.ones(1, dtype=torch.bool)
+            elif self.sequence_embedding == 'random':
+                item['sequence_embed'] = torch.randn((1, 1280))
+                item['sequence_mask'] = torch.ones(1, dtype=torch.bool)
+            elif self.sequence_embedding == 'ESM-full':
+                item['sequence_embed'] = sequence_embed
+                item['sequence_mask'] = sequence_mask
         return item

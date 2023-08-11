@@ -7,6 +7,7 @@ from omegaconf import OmegaConf
 from diffusers import AutoencoderKL
 from torchvision.ops import MLP
 from diffusers.optimization import get_cosine_schedule_with_warmup
+from piqa import SSIM
 
 
 def combine_images(img_set1, img_set2):
@@ -80,7 +81,8 @@ class AutoencoderLightningModule(LightningModule):
         self.image_criterion = nn.MSELoss()
         self.labels_criterion = nn.CrossEntropyLoss()
         self.classifier_coeff = 0.1 # module_config.model.fc_coeff
-        self.kl_coeff = 1e-7
+        self.kl_coeff = 1e-8
+        self.ssim = SSIM(n_channels=1)
         # self.kl_scheduler = GradualKLStepScheduler(1000, 100_000, 1e-5, 1e-3)
 
     def encode(self, images):
@@ -147,9 +149,21 @@ class AutoencoderLightningModule(LightningModule):
                 "val_" + key, value, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True
             )
 
+        ssim_score = {}
+        ssim_score['ssim_pro'] = self.ssim(images[:, 0].unsqueeze_(1), torch.clip(output_images[:, 0].unsqueeze_(1), 0, 1))
+        ssim_score['ssim_nuc'] = self.ssim(images[:, 1].unsqueeze_(1), torch.clip(output_images[:, 1].unsqueeze_(1), 0, 1))
+
+        for key, value in ssim_score.items():
+            self.log(
+                "val_" + key, value, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True
+            )
+
         return images[0].unsqueeze_(0), output_images[0].unsqueeze_(0)
 
     def validation_epoch_end(self, results):
+        if len(results) == 0:
+            return
+
         images = torch.cat([r[0] for r in results])
         output_images = torch.cat([r[1] for r in results])
 
