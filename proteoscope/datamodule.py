@@ -77,6 +77,18 @@ class ProteoscopeDataModule(LightningDataModule):
             trim=self.trim,
             sequence_embedding=self.sequence_embedding,
         )
+
+        self.predict_dataset = ProteoscopeDataset(
+            images=self.images,
+            labels=self.labels,
+            sequences=self.sequences,
+            split_protein=None,
+            split_images=None,
+            transform=None,
+            trim=self.trim,
+            sequence_embedding=self.sequence_embedding,
+        )
+
         self.num_class = self.train_dataset.num_label_class
 
     def train_dataloader(self):
@@ -97,6 +109,15 @@ class ProteoscopeDataModule(LightningDataModule):
             dataset,
             batch_size=self.batch_size,
             shuffle=shuffle,
+            num_workers=self.num_workers,
+            pin_memory=True,
+        )
+
+    def predict_dataloader(self):
+        return DataLoader(
+            self.predict_dataset,
+            batch_size=self.batch_size,
+            shuffle=False,
             num_workers=self.num_workers,
             pin_memory=True,
         )

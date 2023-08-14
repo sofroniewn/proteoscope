@@ -45,7 +45,7 @@ class ProteoscopeLightningModule(LightningModule):
 
         self.cond_images = True
 
-        self.noise_scheduler = DDPMScheduler(num_train_timesteps=100)
+        self.noise_scheduler = DDPMScheduler(num_train_timesteps=400)
 
         self.optim_config = module_config.optimizer
 

@@ -12,9 +12,9 @@ class ProteoscopeDataset(Dataset):
         self,
         images,
         labels,
-        split_protein: str,
+        split_protein: Optional[str] = None,
         trim: Optional[int] = None,
-        split_images: str = "",
+        split_images: Optional[str] = "",
         sequences = None,
         sequence_index = None,
         unique_protein = False,
@@ -36,10 +36,22 @@ class ProteoscopeDataset(Dataset):
 
         self.split_protein = split_protein
         self.split_images = split_images
-        self.labels = labels[
-            (labels["split_protein"] == self.split_protein)
-            & (labels["split_images"] == self.split_images)
-        ]
+        if self.split_protein is not None and self.split_images is not None:
+            self.labels = labels[
+                (labels["split_protein"] == self.split_protein)
+                & (labels["split_images"] == self.split_images)
+            ]
+        elif self.split_protein is not None:
+            self.labels = labels[
+                (labels["split_protein"] == self.split_protein)
+            ]
+        elif self.split_images is not None:
+            self.labels = labels[
+                (labels["split_images"] == self.split_images)
+            ]
+        else:
+            self.labels = labels
+
         if unique_protein:
             self.labels = self.labels.drop_duplicates(subset='ensg')
 
