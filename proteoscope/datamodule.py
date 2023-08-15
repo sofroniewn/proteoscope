@@ -38,7 +38,7 @@ class ProteoscopeDataModule(LightningDataModule):
     def setup(self, stage=None):
         self.images = zarr.open(self.images_path, mode="r")
         self.labels = pd.read_csv(self.labels_path, index_col=0)
-        self.labels = self.labels.fillna('')
+        self.labels = self.labels.fillna('other')
 
         if self.sequences_path is not None:
             self.sequences = zarr.open(self.sequences_path, 'r')
@@ -71,7 +71,7 @@ class ProteoscopeDataModule(LightningDataModule):
             labels=self.labels,
             sequences=self.sequences,
             split_protein="val",
-            split_images="",
+            split_images="val",
             transform=None,
             unique_protein=False,
             trim=self.trim,

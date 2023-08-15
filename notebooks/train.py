@@ -17,7 +17,7 @@ def main(config: ProteoscopeConfig) -> None:
     print("Working directory : {}".format(os.getcwd()))
     if config.model_type == 'proteoscope':
         train_proteoscope(config)
-    elif config.model_type == 'cytoself':
+    elif config.model_type in ['cytoself', 'autoencoder']:
         train_cytoself(config)
     else:
         raise ValueError(f'Unrecognized model type {config.model_type}')

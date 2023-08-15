@@ -38,6 +38,19 @@ class CytoselfModelConfig:
 
 
 @dataclass
+class AutoencoderModelConfig:
+    in_channels: int
+    out_channels: int
+    layers_per_block: int
+    block_out_channels: Tuple[int]
+    latent_channels: int
+    down_block_types: Tuple[str]
+    up_block_types: Tuple[str]
+    classifier_coeff: float
+    kl_coeff: float
+
+
+@dataclass
 class UNetConfig:
     dim: int
     cond_dim: int
@@ -63,6 +76,7 @@ class ProteoscopeModelConfig:
     text_embed_dim: int
     latent_sizes: Optional[Tuple[int]]
 
+
 @dataclass
 class OptimizerConfig:
     learning_rate: float
@@ -76,9 +90,11 @@ class OptimizerConfig:
 
 @dataclass
 class ModuleConfig:
-    model: Union[CytoselfModelConfig, ProteoscopeModelConfig]
+    model: Union[CytoselfModelConfig, AutoencoderModelConfig, ProteoscopeModelConfig]
     optimizer: OptimizerConfig
-    unet_number: Optional[int]
+    image_variance: float
+    dropout: float
+    image_height: int
 
 
 @dataclass

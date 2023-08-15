@@ -52,16 +52,27 @@ for split_indices, split_name in zip(splits, ["train", "val", "test"]):
     df.loc[full_indices, "split_protein"] = split_name
 print((df["split_protein"] == "").sum())
 
-# Create image splits within train proteins
-num_images = (df["split_protein"] == "train").sum()
+
+# Create protein splits
+num_images = len(df)
 splits = split_data(num_images, [0.8, 0.1, 0.1])
 print(num_images, np.sum([len(s) for s in splits]))
 
 df["split_images"] = ""
 for split_indices, split_name in zip(splits, ["train", "val", "test"]):
-    full_indices = df[df["split_protein"] == "train"].index.values
-    df.loc[full_indices[split_indices], "split_images"] = split_name
-print((df["split_images"] != "").sum(), (df["split_protein"] == "train").sum())
+    df.loc[split_indices, "split_images"] = split_name
+print((df["split_images"] == "").sum())
+
+# # Create image splits within train proteins
+# num_images = (df["split_protein"] == "train").sum()
+# splits = split_data(num_images, [0.8, 0.1, 0.1])
+# print(num_images, np.sum([len(s) for s in splits]))
+
+# df["split_images"] = ""
+# for split_indices, split_name in zip(splits, ["train", "val", "test"]):
+#     full_indices = df[df["split_protein"] == "train"].index.values
+#     df.loc[full_indices[split_indices], "split_images"] = split_name
+# print((df["split_images"] != "").sum(), (df["split_protein"] == "train").sum())
 
 # Add labels to proteins in train split
 df['label'] = -1
