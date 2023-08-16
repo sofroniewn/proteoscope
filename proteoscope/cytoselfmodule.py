@@ -11,21 +11,18 @@ from pytorch_lightning import LightningModule
 class CytoselfLightningModule(LightningModule):
     def __init__(
         self,
-        num_class,
         module_config,
     ):
         super(CytoselfLightningModule, self).__init__()
         self.image_variance = module_config.image_variance
 
         model_args = module_config.model
-        if num_class is not None:
-            model_args["num_class"] = num_class
+        model_args["num_class"] = module_config.num_class
         # Conversion needed due to https://github.com/royerlab/cytoself/blob/9f482391a8e7101fde007184f321471cb983d94e/cytoself/trainer/autoencoder/cytoselffull.py#L382
         model_args = OmegaConf.to_container(model_args)
         del model_args["vq_coeff"]
         del model_args["fc_coeff"]
 
-        # model_args['encoder_args'] = [{}] #default_block_args[:len(model_args['emb_shapes'])]
         self.model = CytoselfFull(**model_args)
 
         self.optim_config = module_config.optimizer

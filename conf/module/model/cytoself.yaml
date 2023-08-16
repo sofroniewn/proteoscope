@@ -1,6 +1,6 @@
-input_shape: [2, 96, 96]
-emb_shapes: [[24, 24], [4, 4]]
-output_shape: [2, 96, 96]
+input_shape: [2, 100, 100]
+emb_shapes: [[25, 25], [4, 4]]
+output_shape: [2, 100, 100]
 fc_output_idx: [2]
 vq_args:
   num_embeddings: 2048

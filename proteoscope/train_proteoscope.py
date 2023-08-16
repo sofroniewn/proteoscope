@@ -36,7 +36,7 @@ def train_proteoscope(config: ProteoscopeConfig) -> None:
     if config.trainer.num_devices > 1:
         strategy = "ddp_find_unused_parameters_false"
     else:
-        strategy = None
+        strategy = "auto"
 
     trainer = Trainer(
         max_epochs=config.trainer.max_epochs,
@@ -45,7 +45,6 @@ def train_proteoscope(config: ProteoscopeConfig) -> None:
         limit_val_batches=config.trainer.limit_val_batches,  # 20,
         log_every_n_steps=config.trainer.log_every_n_steps,  # 50,
         logger=TensorBoardLogger(".", "", ""),
-        resume_from_checkpoint=config.chkpt,
         accelerator=config.trainer.device,
         devices=config.trainer.num_devices,
         strategy=strategy,
@@ -57,6 +56,7 @@ def train_proteoscope(config: ProteoscopeConfig) -> None:
     )
     trainer.fit(
         clm,
+        ckpt_path=config.chkpt,
         train_dataloaders=pdm.train_dataloader(),
         val_dataloaders=pdm.val_dataloader(novel_proteins=True),
     )

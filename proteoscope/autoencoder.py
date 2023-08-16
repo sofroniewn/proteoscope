@@ -47,6 +47,7 @@ class AutoencoderLightningModule(LightningModule):
         self.labels_criterion = nn.CrossEntropyLoss()
 
         self.ssim = SSIM(n_channels=1)
+        self.results = []
 
     def encode(self, images):
         latent_dist = self.vae.encode(images).latent_dist
@@ -150,17 +151,22 @@ class AutoencoderLightningModule(LightningModule):
                 sync_dist=True,
             )
 
-        return images[0].unsqueeze_(0), output_images[0].unsqueeze_(0)
+        if self.global_rank == 0 and len(self.results) < 16:
+            self.results.append((images[0].unsqueeze_(0), output_images[0].unsqueeze_(0)))
 
-    def validation_epoch_end(self, results):
-        if len(results) == 0:
+    def on_validation_epoch_end(self):
+        if self.global_rank != 0:
             return
 
-        images = torch.cat([r[0] for r in results])
-        output_images = torch.cat([r[1] for r in results])
+        if len(self.results) == 0:
+            return
 
-        pro = combine_images(images[:16:2, 0], output_images[:16:2, 0])
-        nuc = combine_images(images[:16:2, 1], output_images[:16:2, 1])
+        images = torch.cat([r[0] for r in self.results])
+        output_images = torch.cat([r[1] for r in self.results])
+        self.results = []
+    
+        pro = combine_images(images[:16, 0], output_images[:16, 0])
+        nuc = combine_images(images[:16, 1], output_images[:16, 1])
 
         if self.global_step > 0:
             tensorboard_logger = self.logger.experiment
