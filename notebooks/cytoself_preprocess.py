@@ -39,7 +39,7 @@ for file in labels:
     df.append(pd.read_csv(file))
 df = pd.concat(df)
 df = df.reset_index()
-df = df.fillna('')
+df = df.fillna("")
 
 # Create protein splits
 num_proteins = len(df["ensg"].unique())
@@ -75,10 +75,10 @@ print((df["split_images"] == "").sum())
 # print((df["split_images"] != "").sum(), (df["split_protein"] == "train").sum())
 
 # Add labels to proteins in train split
-df['label'] = -1
-train_proteins = df["split_protein"] == 'train'
-unqiue_indices = df.loc[train_proteins, 'ensg'].factorize()[0]
-df.loc[train_proteins, 'label'] = unqiue_indices
+df["label"] = -1
+train_proteins = df["split_protein"] == "train"
+unqiue_indices = df.loc[train_proteins, "ensg"].factorize()[0]
+df.loc[train_proteins, "label"] = unqiue_indices
 
 df.to_csv(join(datapath, "labels.csv"))
 

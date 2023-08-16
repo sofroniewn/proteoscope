@@ -1,13 +1,12 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from pytorch_lightning import LightningModule
-from omegaconf import OmegaConf
-
 from diffusers import AutoencoderKL
-from torchvision.ops import MLP
 from diffusers.optimization import get_cosine_schedule_with_warmup
+from omegaconf import OmegaConf
 from piqa import SSIM
+from pytorch_lightning import LightningModule
+from torchvision.ops import MLP
 
 
 def combine_images(img_set1, img_set2):
@@ -31,13 +30,12 @@ class AutoencoderLightningModule(LightningModule):
             block_out_channels=module_config.model.block_out_channels,  # the number of output channels for each UNet block
             latent_channels=module_config.model.latent_channels,
             down_block_types=module_config.model.down_block_types,
-            up_block_types=module_config.model.up_block_types,  
+            up_block_types=module_config.model.up_block_types,
         )
 
         self.image_variance = module_config.image_variance
         # self.classifier_coeff = module_config.model.classifier_coeff
         self.kl_coeff = module_config.model.kl_coeff
-
 
         # height = module_config.image_height / (2 ** (len(module_config.model.block_out_channels) - 1))
         # in_channels = int(module_config.model.latent_channels * height * height)
@@ -63,7 +61,7 @@ class AutoencoderLightningModule(LightningModule):
     def forward(self, images):
         latent_dist = self.vae.encode(images).latent_dist
         mu, logvar = latent_dist.mean, latent_dist.logvar
-        
+
         # Reparameterization trick
         std = torch.exp(logvar / 2)
         eps = torch.randn_like(std)
@@ -74,48 +72,82 @@ class AutoencoderLightningModule(LightningModule):
 
         return reconstructed, mu, logvar, None
 
-    def _calc_losses(self, images, labels, output_images, output_mu, output_logvar, output_logits):
-
+    def _calc_losses(
+        self, images, labels, output_images, output_mu, output_logvar, output_logits
+    ):
         loss = {}
-        loss['kl_divergence'] = -0.5 * torch.sum(1 + output_logvar - output_mu.pow(2) - output_logvar.exp())
-        loss['reconstruction'] = self.image_criterion(output_images, images) / self.image_variance
+        loss["kl_divergence"] = -0.5 * torch.sum(
+            1 + output_logvar - output_mu.pow(2) - output_logvar.exp()
+        )
+        loss["reconstruction"] = (
+            self.image_criterion(output_images, images) / self.image_variance
+        )
         # loss['classification'] = self.labels_criterion(output_logits, labels)
 
-        loss['loss'] = loss['reconstruction'] + self.kl_coeff * loss['kl_divergence'] # + self.classifier_coeff * loss['classification']
+        loss["loss"] = (
+            loss["reconstruction"] + self.kl_coeff * loss["kl_divergence"]
+        )  # + self.classifier_coeff * loss['classification']
         return loss
 
     def training_step(self, batch, batch_idx, dataloader_idx=0):
-        images = batch['image']
-        labels = batch['label']
+        images = batch["image"]
+        labels = batch["label"]
         output_images, output_mu, output_logvar, output_logits = self(images)
 
-        loss = self._calc_losses(images, labels, output_images, output_mu, output_logvar, output_logits)        
+        loss = self._calc_losses(
+            images, labels, output_images, output_mu, output_logvar, output_logits
+        )
 
         for key, value in loss.items():
             self.log(
-                "train_" + key, value, on_step=True, on_epoch=False, prog_bar=True, logger=True
+                "train_" + key,
+                value,
+                on_step=True,
+                on_epoch=False,
+                prog_bar=True,
+                logger=True,
             )
-        
-        return loss['loss']
+
+        return loss["loss"]
 
     def validation_step(self, batch, batch_idx, dataloader_idx=0):
-        images = batch['image']
-        labels = batch['label']
+        images = batch["image"]
+        labels = batch["label"]
         output_images, output_mu, output_logvar, output_logits = self(images)
-        loss = self._calc_losses(images, labels, output_images, output_mu, output_logvar, output_logits)            
+        loss = self._calc_losses(
+            images, labels, output_images, output_mu, output_logvar, output_logits
+        )
 
         for key, value in loss.items():
             self.log(
-                "val_" + key, value, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True
+                "val_" + key,
+                value,
+                on_step=False,
+                on_epoch=True,
+                prog_bar=True,
+                logger=True,
+                sync_dist=True,
             )
 
         ssim_score = {}
-        ssim_score['ssim_pro'] = self.ssim(images[:, 0].unsqueeze_(1), torch.clip(output_images[:, 0].unsqueeze_(1), 0, 1))
-        ssim_score['ssim_nuc'] = self.ssim(images[:, 1].unsqueeze_(1), torch.clip(output_images[:, 1].unsqueeze_(1), 0, 1))
+        ssim_score["ssim_pro"] = self.ssim(
+            images[:, 0].unsqueeze_(1),
+            torch.clip(output_images[:, 0].unsqueeze_(1), 0, 1),
+        )
+        ssim_score["ssim_nuc"] = self.ssim(
+            images[:, 1].unsqueeze_(1),
+            torch.clip(output_images[:, 1].unsqueeze_(1), 0, 1),
+        )
 
         for key, value in ssim_score.items():
             self.log(
-                "val_" + key, value, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True
+                "val_" + key,
+                value,
+                on_step=False,
+                on_epoch=True,
+                prog_bar=True,
+                logger=True,
+                sync_dist=True,
             )
 
         return images[0].unsqueeze_(0), output_images[0].unsqueeze_(0)
@@ -147,7 +179,7 @@ class AutoencoderLightningModule(LightningModule):
             )
 
     def configure_optimizers(self):
-        params = list(self.vae.parameters()) # + list(self.classifier.parameters())
+        params = list(self.vae.parameters())  # + list(self.classifier.parameters())
 
         optimizer = optim.AdamW(
             params,
@@ -156,19 +188,19 @@ class AutoencoderLightningModule(LightningModule):
             eps=self.optim_config.eps,
             weight_decay=self.optim_config.weight_decay,
         )
-        
+
         self.lr_scheduler = get_cosine_schedule_with_warmup(
             optimizer,
             num_warmup_steps=self.optim_config.warmup,
             num_training_steps=self.optim_config.max_iters,
         )
-        
+
         return {
             "optimizer": optimizer,
             "lr_scheduler": {
                 "scheduler": self.lr_scheduler,
-                "interval": "step"  # 'step' since you're updating per batch/iteration
-            }
+                "interval": "step",  # 'step' since you're updating per batch/iteration
+            },
         }
 
     def optimizer_step(self, *args, **kwargs):

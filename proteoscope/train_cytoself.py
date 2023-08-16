@@ -3,14 +3,13 @@ from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import LearningRateMonitor, ModelCheckpoint
 from pytorch_lightning.loggers import TensorBoardLogger
 
-from .datamodule import ProteoscopeDataModule
+from .autoencoder import AutoencoderLightningModule
 from .config import ProteoscopeConfig
 from .cytoselfmodule import CytoselfLightningModule
-from .autoencoder import AutoencoderLightningModule
+from .datamodule import ProteoscopeDataModule
 
 
 def train_cytoself(config: ProteoscopeConfig) -> None:
-
     pdm = ProteoscopeDataModule(
         images_path=config.data.images_path,
         labels_path=config.data.labels_path,
@@ -20,18 +19,18 @@ def train_cytoself(config: ProteoscopeConfig) -> None:
     )
     pdm.setup()
 
-    if config.model_type == 'cytoself':
+    if config.model_type == "cytoself":
         clm = AutoencoderLightningModule(
             module_config=config.module,
             num_class=pdm.num_class,
         )
-    elif config.model_type == 'autoencoder':
+    elif config.model_type == "autoencoder":
         clm = AutoencoderLightningModule(
             module_config=config.module,
             num_class=pdm.num_class,
         )
     else:
-        raise ValueError(f'Unrecognized model type {config.model_type}')
+        raise ValueError(f"Unrecognized model type {config.model_type}")
 
     print(clm)
     print(
@@ -65,4 +64,8 @@ def train_cytoself(config: ProteoscopeConfig) -> None:
         gradient_clip_val=config.trainer.gradient_clip_val,
         deterministic=True,
     )
-    trainer.fit(clm, train_dataloaders=pdm.train_dataloader(), val_dataloaders=pdm.val_dataloader(novel_proteins=False))
+    trainer.fit(
+        clm,
+        train_dataloaders=pdm.train_dataloader(),
+        val_dataloaders=pdm.val_dataloader(novel_proteins=False),
+    )

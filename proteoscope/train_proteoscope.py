@@ -3,13 +3,12 @@ from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import LearningRateMonitor, ModelCheckpoint
 from pytorch_lightning.loggers import TensorBoardLogger
 
-from .datamodule import ProteoscopeDataModule
 from .config import ProteoscopeConfig
+from .datamodule import ProteoscopeDataModule
 from .proteoscopemodule import ProteoscopeLightningModule
 
 
 def train_proteoscope(config: ProteoscopeConfig) -> None:
-
     pdm = ProteoscopeDataModule(
         images_path=config.data.images_path,
         labels_path=config.data.labels_path,
@@ -56,4 +55,8 @@ def train_proteoscope(config: ProteoscopeConfig) -> None:
         gradient_clip_val=config.trainer.gradient_clip_val,
         deterministic=True,
     )
-    trainer.fit(clm, train_dataloaders=pdm.train_dataloader(), val_dataloaders=pdm.val_dataloader(novel_proteins=True))
+    trainer.fit(
+        clm,
+        train_dataloaders=pdm.train_dataloader(),
+        val_dataloaders=pdm.val_dataloader(novel_proteins=True),
+    )

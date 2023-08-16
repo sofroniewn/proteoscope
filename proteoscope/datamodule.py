@@ -4,7 +4,6 @@ from typing import Optional, Union
 
 import pandas as pd
 import zarr
-from anndata import read_h5ad  # type: ignore
 from pytorch_lightning import LightningDataModule
 from torch.utils.data import DataLoader
 
@@ -38,10 +37,10 @@ class ProteoscopeDataModule(LightningDataModule):
     def setup(self, stage=None):
         self.images = zarr.open(self.images_path, mode="r")
         self.labels = pd.read_csv(self.labels_path, index_col=0)
-        self.labels = self.labels.fillna('other')
+        self.labels = self.labels.fillna("other")
 
         if self.sequences_path is not None:
-            self.sequences = zarr.open(self.sequences_path, 'r')
+            self.sequences = zarr.open(self.sequences_path, "r")
         else:
             self.sequences = None
 

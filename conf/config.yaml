@@ -6,10 +6,10 @@ defaults:
 
 hydra:
   run:
-    dir: /home/ec2-user/outputs-proteoscope/cytoself/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    dir: /home/ec2-user/outputs/cytoself/${now:%Y-%m-%d}/${now:%H-%M-%S}
 
 model_type: cytoself #cytoself proteoscope autoencoder
-chkpt: null #/home/ec2-user/outputs-proteoscope/autoencoder/2023-08-15/03-57-15/checkpoints/last.ckpt # null
+chkpt: null #/home/ec2-user/outputs/autoencoder/2023-08-15/03-57-15/checkpoints/last.ckpt # null
 module:
   image_variance: 0.0167
   dropout: 0.2

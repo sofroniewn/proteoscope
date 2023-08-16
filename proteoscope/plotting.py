@@ -1,6 +1,6 @@
-from ipywidgets import interact
-import seaborn_image as isns
 import numpy as np
+import seaborn_image as isns
+from ipywidgets import interact
 
 
 def contrast_normalize(image, percentiles):
@@ -23,12 +23,18 @@ def merge_prot_nuc(image, percentiles=None):
 
 def browse_reconstructions(A, B, true_names):
     unique_names = np.unique(true_names)
+
     def view_image(name):
         keep = true_names == name
         true = A[keep]
         predicted = B[keep]
         n = min(16, keep.sum())
         use = np.random.choice(keep.sum(), size=n, replace=False)
-        isns.ImageGrid(true[use], col_wrap=8, cbar=False, height=1.5, axis=0, cmap='viridis');
-        isns.ImageGrid(predicted[use], col_wrap=8, cbar=False, height=1.5, axis=0, cmap='viridis');
+        isns.ImageGrid(
+            true[use], col_wrap=8, cbar=False, height=1.5, axis=0, cmap="viridis"
+        )
+        isns.ImageGrid(
+            predicted[use], col_wrap=8, cbar=False, height=1.5, axis=0, cmap="viridis"
+        )
+
     interact(view_image, name=unique_names)

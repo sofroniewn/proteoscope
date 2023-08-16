@@ -10,7 +10,14 @@ with open("README.rst") as readme_file:
 with open("HISTORY.rst") as history_file:
     history = history_file.read()
 
-requirements = []
+requirements = [
+    "hydra-core",
+    "pytorch-lightning",
+    "zarr",
+    "diffusers",
+    "piqa",
+    "cytoself @ git+https://github.com/royerlab/cytoself.git",
+]
 
 test_requirements = ["pytest>=3"]
 
