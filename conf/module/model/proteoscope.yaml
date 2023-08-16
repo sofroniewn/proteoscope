@@ -1,11 +1,11 @@
-sample_size: 24
+sample_size: 25
 in_channels: 8
 out_channels: 4
 layers_per_block: 2
-block_out_channels: [128, 256, 256, 512]
+block_out_channels: [128, 256, 512]
 latent_channels: 4
-down_block_types: ['CrossAttnDownBlock2D', 'CrossAttnDownBlock2D', 'CrossAttnDownBlock2D', 'DownBlock2D']
-up_block_types: ['UpBlock2D', 'CrossAttnUpBlock2D', 'CrossAttnUpBlock2D', 'CrossAttnUpBlock2D']
+down_block_types: ['CrossAttnDownBlock2D', 'CrossAttnDownBlock2D', 'DownBlock2D']
+up_block_types: ['UpBlock2D', 'CrossAttnUpBlock2D', 'CrossAttnUpBlock2D']
 cross_attention_dim: 1280
 num_train_timesteps: 1000
 cond_images: True
