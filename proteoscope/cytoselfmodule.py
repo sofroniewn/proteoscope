@@ -13,10 +13,9 @@ class CytoselfLightningModule(LightningModule):
         self,
         num_class,
         module_config,
-        image_variance = 0.0167,
     ):
         super(CytoselfLightningModule, self).__init__()
-        self.image_variance = image_variance
+        self.image_variance = module_config.image_variance
 
         model_args = module_config.model
         if num_class is not None:
@@ -101,7 +100,14 @@ class CytoselfLightningModule(LightningModule):
             num_warmup_steps=self.optim_config.warmup,
             num_training_steps=self.optim_config.max_iters,
         )
-        return optimizer
+        
+        return {
+            "optimizer": optimizer,
+            "lr_scheduler": {
+                "scheduler": self.lr_scheduler,
+                "interval": "step"  # 'step' since you're updating per batch/iteration
+            }
+        }
 
     def optimizer_step(self, *args, **kwargs):
         super().optimizer_step(*args, **kwargs)

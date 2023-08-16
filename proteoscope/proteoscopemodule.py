@@ -4,7 +4,7 @@ import torch.nn.functional as F
 from pytorch_lightning import LightningModule
 from tqdm.auto import tqdm
 
-from diffusers import DDPMScheduler, UNet2DConditionModel
+from diffusers import DDIMScheduler, UNet2DConditionModel
 from diffusers.optimization import get_cosine_schedule_with_warmup
 from piqa import SSIM
 
@@ -25,46 +25,37 @@ class ProteoscopeLightningModule(LightningModule):
     ):
         super(ProteoscopeLightningModule, self).__init__()
         self.unet = UNet2DConditionModel(
-            sample_size=12,  # the target image resolution
-            in_channels=2*16,  # the number of input channels, 3 for RGB images
-            out_channels=16,  # the number of output channels
-            layers_per_block=2,  # how many ResNet layers to use per UNet block
-            block_out_channels=(256, 512, 512),  # the number of output channels for each UNet block
-            down_block_types=(
-                "CrossAttnDownBlock2D",
-                "CrossAttnDownBlock2D", #BAD # a ResNet downsampling block with spatial self-attention
-                "DownBlock2D",
-            ),
-            up_block_types=(
-                "UpBlock2D",  # a regular ResNet upsampling block
-                "CrossAttnUpBlock2D",  # a ResNet upsampling block with spatial self-attention
-                "CrossAttnUpBlock2D",
-            ),
-            cross_attention_dim=1280,
+            sample_size=module_config.model.sample_size,  # the target image resolution
+            in_channels=module_config.model.in_channels,  # the number of input channels, 3 for RGB images
+            out_channels=module_config.model.out_channels,  # the number of output channels
+            layers_per_block=module_config.model.layers_per_block,  # how many ResNet layers to use per UNet block
+            block_out_channels=module_config.model.block_out_channels,  # the number of output channels for each UNet block
+            down_block_types=module_config.model.down_block_types,
+            up_block_types=module_config.model.up_block_types,
+            cross_attention_dim=module_config.model.cross_attention_dim,
         )
+        self.latents_shape = (module_config.model.out_channels, module_config.model.sample_size, module_config.model.sample_size)
+        self.unconditioned_probability = module_config.model.unconditioned_probability
+        self.latents_init_scale = module_config.model.latents_init_scale
+        self.guidance_scale =module_config.model.guidance_scale
 
-        self.cond_images = True
+        self.cond_images = module_config.model.cond_images
 
-        self.noise_scheduler = DDPMScheduler(num_train_timesteps=400)
+        self.noise_scheduler = DDIMScheduler(num_train_timesteps=module_config.model.num_train_timesteps)
 
         self.optim_config = module_config.optimizer
 
-        self.cytoself_layer = module_config.model.cytoself_layer
-        cytoself_checkpoint = module_config.model.cytoself_checkpoint
-        module_config.model = module_config.model.cytoself
+        autoencoder_checkpoint = module_config.model.autoencoder_checkpoint
+        module_config.model = module_config.model.autoencoder
         clm = AutoencoderLightningModule.load_from_checkpoint(
-            cytoself_checkpoint,
+            autoencoder_checkpoint,
             module_config=module_config,
-            num_class=1049,
         )
+
         self.autoencoder = clm.vae
         self.autoencoder.eval()
         self.autoencoder.to(self.unet.device)
 
-        self.latents_shape = (16, 12, 12)
-        self.latents_init_scale = 12.0
-        self.unconditioned_probability = 0.2
-        self.guidance_scale = 3.0
         self.ssim = SSIM(n_channels=1)
 
     def forward(self, batch):
@@ -136,7 +127,8 @@ class ProteoscopeLightningModule(LightningModule):
         batch['sequence_embed'] = seq_emb
         batch['sequence_mask'] = seq_mask
 
-        output_latents = self.sample(batch, guidance_scale=self.guidance_scale)
+        num_inference_steps = self.noise_scheduler.config.num_train_timesteps // 10
+        output_latents = self.sample(batch, guidance_scale=self.guidance_scale, num_inference_steps=num_inference_steps)
         output_images = self.autoencoder.decode(output_latents).sample
 
         pro = combine_images(images[:, 0], output_images[:, 0])
@@ -236,7 +228,14 @@ class ProteoscopeLightningModule(LightningModule):
             num_warmup_steps=self.optim_config.warmup,
             num_training_steps=self.optim_config.max_iters,
         )
-        return optimizer
+
+        return {
+            "optimizer": optimizer,
+            "lr_scheduler": {
+                "scheduler": self.lr_scheduler,
+                "interval": "step"  # 'step' since you're updating per batch/iteration
+            }
+        }
 
     def optimizer_step(self, *args, **kwargs):
         super().optimizer_step(*args, **kwargs)

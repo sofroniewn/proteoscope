@@ -64,17 +64,21 @@ class UNetConfig:
 
 @dataclass
 class ProteoscopeModelConfig:
-    unet1: UNetConfig
-    unet2: Optional[UNetConfig]
-    cytoself: Optional[CytoselfModelConfig]
-    cytoself_checkpoint: Optional[str]
-    cytoself_layer: Optional[str]
-    image_sizes: Tuple[int]
-    timesteps: int
-    cond_drop_prob: float
-    channels: int
-    text_embed_dim: int
-    latent_sizes: Optional[Tuple[int]]
+    sample_size: int
+    in_channels: int
+    out_channels: int
+    layers_per_block: int
+    block_out_channels: Tuple[int]
+    down_block_types: Tuple[str]
+    up_block_types: Tuple[str]
+    cross_attention_dim: int
+    num_train_timesteps: int
+    cond_images: bool
+    unconditioned_probability: float
+    latents_init_scale: float
+    guidance_scale: float
+    autoencoder: AutoencoderModelConfig
+    autoencoder_checkpoint: str
 
 
 @dataclass

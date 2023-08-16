@@ -20,7 +20,6 @@ def combine_images(img_set1, img_set2):
 class AutoencoderLightningModule(LightningModule):
     def __init__(
         self,
-        num_class,
         module_config,
     ):
         super(AutoencoderLightningModule, self).__init__()
@@ -42,7 +41,7 @@ class AutoencoderLightningModule(LightningModule):
 
         # height = module_config.image_height / (2 ** (len(module_config.model.block_out_channels) - 1))
         # in_channels = int(module_config.model.latent_channels * height * height)
-        # self.classifier = MLP(in_channels, [in_channels*2, num_class], dropout=module_config.dropout, inplace=False)
+        # self.classifier = MLP(in_channels, [in_channels*2, module_config.num_class], dropout=module_config.dropout, inplace=False)
 
         self.optim_config = module_config.optimizer
 
