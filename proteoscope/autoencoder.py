@@ -53,11 +53,14 @@ class AutoencoderLightningModule(LightningModule):
         latent_dist = self.vae.encode(images).latent_dist
         return latent_dist.mean
 
-    def sample(self, images):
+    def sample(self, images, return_embed=False):
         latent_dist = self.vae.encode(images).latent_dist
         mu = latent_dist.mean
         reconstructed = self.vae.decode(mu).sample
-        return reconstructed
+        if return_embed:
+            return reconstructed, mu
+        else:
+            return reconstructed
 
     def forward(self, images):
         latent_dist = self.vae.encode(images).latent_dist
