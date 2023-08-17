@@ -4,12 +4,12 @@ from pytorch_lightning.callbacks import LearningRateMonitor, ModelCheckpoint
 from pytorch_lightning.loggers import TensorBoardLogger
 
 from .config import ProteoscopeConfig
-from .datamodule import ProteoscopeDataModule
-from .proteoscopemodule import ProteoscopeLightningModule
+from .data import ProteoscopeDM
+from .modules import ProteoscopeLM
 
 
 def train_proteoscope(config: ProteoscopeConfig) -> None:
-    pdm = ProteoscopeDataModule(
+    pdm = ProteoscopeDM(
         images_path=config.data.images_path,
         labels_path=config.data.labels_path,
         trim=config.data.trim,

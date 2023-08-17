@@ -17,6 +17,7 @@ requirements = [
     "diffusers",
     "piqa",
     "cytoself @ git+https://github.com/royerlab/cytoself.git",
+    'seaborn_image',
 ]
 
 test_requirements = ["pytest>=3"]

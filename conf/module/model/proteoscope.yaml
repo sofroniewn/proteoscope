@@ -10,9 +10,9 @@ cross_attention_dim: 1280
 num_train_timesteps: 1000
 cond_images: True
 unconditioned_probability: 0.2
-latents_init_scale: 10.0
+latents_init_scale: 11.0
 guidance_scale: 3.0
-autoencoder_checkpoint: /home/ec2-user/outputs/autoencoder/2023-08-16/20-28-32/checkpoints/last.ckpt
+autoencoder_checkpoint: /home/ec2-user/outputs/autoencoder/2023-08-17/05-03-37/checkpoints/last.ckpt
 autoencoder:
   in_channels: 2
   out_channels: 2

@@ -3,14 +3,13 @@ from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import LearningRateMonitor, ModelCheckpoint
 from pytorch_lightning.loggers import TensorBoardLogger
 
-from .autoencoder import AutoencoderLightningModule
 from .config import ProteoscopeConfig
-from .cytoselfmodule import CytoselfLightningModule
-from .datamodule import ProteoscopeDataModule
+from .modules import AutoencoderLM, CytoselfLM
+from .data import ProteoscopeDM
 
 
 def train_cytoself(config: ProteoscopeConfig) -> None:
-    pdm = ProteoscopeDataModule(
+    pdm = ProteoscopeDM(
         images_path=config.data.images_path,
         labels_path=config.data.labels_path,
         trim=config.data.trim,
@@ -20,11 +19,11 @@ def train_cytoself(config: ProteoscopeConfig) -> None:
     pdm.setup()
 
     if config.model_type == "cytoself":
-        clm = CytoselfLightningModule(
+        clm = CytoselfLM(
             module_config=config.module,
         )
     elif config.model_type == "autoencoder":
-        clm = AutoencoderLightningModule(
+        clm = AutoencoderLM(
             module_config=config.module,
         )
     else:
