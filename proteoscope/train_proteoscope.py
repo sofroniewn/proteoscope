@@ -34,7 +34,7 @@ def train_proteoscope(config: ProteoscopeConfig) -> None:
     lr_monitor_callback = LearningRateMonitor(logging_interval="step")
 
     if config.trainer.num_devices > 1:
-        strategy = "ddp_find_unused_parameters_false"
+        strategy = "ddp_find_unused_parameters_true"
     else:
         strategy = "auto"
 

@@ -139,13 +139,12 @@ class ProteoscopeLightningModule(LightningModule):
             sync_dist=True,
         )
 
-
         if self.global_rank == 0 and len(self.results) < 16:
             self.results.append((
-            batch["image"][0].unsqueeze_(0),
-            batch["sequence_embed"][0].unsqueeze_(0),
-            batch["sequence_mask"][0].unsqueeze_(0),
-        ))
+                batch["image"][0].unsqueeze_(0),
+                batch["sequence_embed"][0].unsqueeze_(0),
+                batch["sequence_mask"][0].unsqueeze_(0),
+            ))
 
     def on_validation_epoch_end(self):
         if self.global_rank != 0:
@@ -194,7 +193,7 @@ class ProteoscopeLightningModule(LightningModule):
                     on_epoch=True,
                     prog_bar=True,
                     logger=True,
-                    sync_dist=True,
+                    sync_dist=False,
                 )
 
             tensorboard_logger = self.logger.experiment
