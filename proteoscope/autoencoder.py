@@ -46,7 +46,7 @@ class AutoencoderLightningModule(LightningModule):
         self.image_criterion = nn.MSELoss()
         self.labels_criterion = nn.CrossEntropyLoss()
 
-        self.ssim = SSIM(n_channels=1)
+        self.ssim = SSIM(n_channels=2)
         self.results = []
 
     def encode(self, images):
@@ -83,13 +83,18 @@ class AutoencoderLightningModule(LightningModule):
         loss["kl_divergence"] = -0.5 * torch.sum(
             1 + output_logvar - output_mu.pow(2) - output_logvar.exp()
         )
-        loss["reconstruction"] = (
-            self.image_criterion(output_images, images) / self.image_variance
-        )
+        # loss["reconstruction"] = (
+        #     self.image_criterion(output_images, images) / self.image_variance
+        # )
         # loss['classification'] = self.labels_criterion(output_logits, labels)
 
+        loss["ssim"] = 1 - self.ssim(
+            images,
+            torch.clip(output_images, 0, 1),
+        )
+
         loss["loss"] = (
-            loss["reconstruction"] + self.kl_coeff * loss["kl_divergence"]
+            0 + self.kl_coeff * loss["kl_divergence"] + loss["ssim"]
         )  # + self.classifier_coeff * loss['classification']
         return loss
 
@@ -133,26 +138,26 @@ class AutoencoderLightningModule(LightningModule):
                 sync_dist=True,
             )
 
-        ssim_score = {}
-        ssim_score["ssim_pro"] = self.ssim(
-            images[:, 0].unsqueeze_(1),
-            torch.clip(output_images[:, 0].unsqueeze_(1), 0, 1),
-        )
-        ssim_score["ssim_nuc"] = self.ssim(
-            images[:, 1].unsqueeze_(1),
-            torch.clip(output_images[:, 1].unsqueeze_(1), 0, 1),
-        )
+        # ssim_score = {}
+        # ssim_score["ssim_pro"] = self.ssim(
+        #     images[:, 0].unsqueeze_(1),
+        #     torch.clip(output_images[:, 0].unsqueeze_(1), 0, 1),
+        # )
+        # ssim_score["ssim_nuc"] = self.ssim(
+        #     images[:, 1].unsqueeze_(1),
+        #     torch.clip(output_images[:, 1].unsqueeze_(1), 0, 1),
+        # )
 
-        for key, value in ssim_score.items():
-            self.log(
-                "val_" + key,
-                value,
-                on_step=False,
-                on_epoch=True,
-                prog_bar=True,
-                logger=True,
-                sync_dist=True,
-            )
+        # for key, value in ssim_score.items():
+        #     self.log(
+        #         "val_" + key,
+        #         value,
+        #         on_step=False,
+        #         on_epoch=True,
+        #         prog_bar=True,
+        #         logger=True,
+        #         sync_dist=True,
+        #     )
 
         if self.global_rank == 0 and len(self.results) < 16:
             self.results.append((images[0].unsqueeze_(0), output_images[0].unsqueeze_(0)))
