@@ -1,7 +1,7 @@
 import torch
 import torch.nn.functional as F
 import torch.optim as optim
-from diffusers import DDIMScheduler, UNet2DConditionModel
+from diffusers import DDPMScheduler, UNet2DConditionModel
 from diffusers.optimization import get_cosine_schedule_with_warmup
 from piqa import SSIM
 from pytorch_lightning import LightningModule
@@ -44,7 +44,7 @@ class ProteoscopeLM(LightningModule):
 
         self.cond_images = module_config.model.cond_images
 
-        self.noise_scheduler = DDIMScheduler(
+        self.noise_scheduler = DDPMScheduler(
             num_train_timesteps=module_config.model.num_train_timesteps
         )
 
@@ -163,7 +163,7 @@ class ProteoscopeLM(LightningModule):
         batch["sequence_embed"] = seq_emb
         batch["sequence_mask"] = seq_mask
 
-        num_inference_steps = self.noise_scheduler.config.num_train_timesteps // 10
+        num_inference_steps = self.noise_scheduler.config.num_train_timesteps
         output_latents = self.sample(
             batch,
             guidance_scale=self.guidance_scale,

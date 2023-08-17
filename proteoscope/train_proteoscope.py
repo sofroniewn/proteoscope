@@ -20,7 +20,7 @@ def train_proteoscope(config: ProteoscopeConfig) -> None:
     )
     pdm.setup()
 
-    clm = ProteoscopeLightningModule(
+    clm = ProteoscopeLM(
         module_config=config.module,
     )
     print(clm)
