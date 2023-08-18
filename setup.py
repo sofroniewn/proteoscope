@@ -16,6 +16,7 @@ requirements = [
     "zarr",
     "diffusers",
     "piqa",
+    "torch-fidelity"
     "cytoself @ git+https://github.com/royerlab/cytoself.git",
     'seaborn_image',
 ]
