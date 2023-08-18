@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from diffusers import AutoencoderKL
-from diffusers.optimization import get_cosine_schedule_with_warmup
+from torch.optim.lr_scheduler import CosineAnnealingLR
 from omegaconf import OmegaConf
 from piqa import SSIM
 from pytorch_lightning import LightningModule
@@ -35,18 +35,28 @@ class AutoencoderLM(LightningModule):
         )
 
         self.image_variance = module_config.image_variance
-        # self.classifier_coeff = module_config.model.classifier_coeff
-        self.kl_weight = module_config.model.kl_coeff
-        self.perceptual_weight = 1.0
+        self.classifier_weight = module_config.model.classifier_weight
+        self.kl_weight = module_config.model.kl_weight
+        self.perceptual_weight = module_config.model.perceptual_weight
+        self.pixel_weight = module_config.model.pixel_weight
 
-        # height = module_config.image_height / (2 ** (len(module_config.model.block_out_channels) - 1))
-        # in_channels = int(module_config.model.latent_channels * height * height)
-        # self.classifier = MLP(in_channels, [in_channels*2, module_config.num_class], dropout=module_config.dropout, inplace=False)
+        height = module_config.image_height / (
+            2 ** (len(module_config.model.block_out_channels) - 1)
+        )
+        in_channels = int(module_config.model.latent_channels * height * height)
+        self.classifier = MLP(
+            in_channels,
+            [in_channels * 2, module_config.num_class],
+            dropout=module_config.dropout,
+            inplace=False,
+        )
 
         self.optim_config = module_config.optimizer
 
         self.image_criterion = nn.L1Loss()
-        self.perceptual_criterion = LearnedPerceptualImagePatchSimilarity(net_type='vgg')
+        self.perceptual_criterion = LearnedPerceptualImagePatchSimilarity(
+            net_type="vgg"
+        )
         self.labels_criterion = nn.CrossEntropyLoss()
 
         self.ssim = SSIM(n_channels=1)
@@ -75,9 +85,9 @@ class AutoencoderLM(LightningModule):
         z = mu + eps * std
 
         reconstructed = self.vae.decode(z).sample
-        # logits = self.classifier(mu.reshape(mu.shape[0], -1))
+        logits = self.classifier(mu.reshape(mu.shape[0], -1))
 
-        return reconstructed, mu, logvar, None
+        return reconstructed, mu, logvar, logits
 
     def _calc_losses(
         self, images, labels, output_images, output_mu, output_logvar, output_logits
@@ -87,18 +97,26 @@ class AutoencoderLM(LightningModule):
         loss["kl_divergence"] = -0.5 * torch.sum(
             1 + output_logvar - output_mu.pow(2) - output_logvar.exp()
         )
-        
-        loss["reconstruction"] = self.image_criterion(output_images, images)
 
-        output_images_3 = torch.cat((output_images[:, 0:1], output_images), dim=1)
-        images_3 = torch.cat((images[:, 0:1], images), dim=1)
-        loss["perceptual"] = self.perceptual_criterion(output_images_3.clip(0, 1), images_3)
-        
-        # loss['classification'] = self.labels_criterion(output_logits, labels)
+        loss["pixel"] = self.image_criterion(output_images, images)
+
+        loss["perceptual_pro"] = self.perceptual_criterion(
+            output_images[:, 0].clip(0, 1).unsqueeze(1).tile(1, 3, 1, 1),
+            images[:, 0].unsqueeze(1).tile(1, 3, 1, 1),
+        )
+        loss["perceptual_nuc"] = self.perceptual_criterion(
+            output_images[:, 1].clip(0, 1).unsqueeze(1).tile(1, 3, 1, 1),
+            images[:, 1].unsqueeze(1).tile(1, 3, 1, 1),
+        )
+
+        loss['classification'] = self.labels_criterion(output_logits, labels)
 
         loss["loss"] = (
-            loss["reconstruction"] + self.perceptual_weight * loss["perceptual"] + self.kl_weight * loss["kl_divergence"]
-        )  # + self.classifier_coeff * loss['classification']
+            self.pixel_weight * loss["pixel"]
+            + self.perceptual_weight * (loss["perceptual_pro"] + loss["perceptual_nuc"]) / 2
+            + self.kl_weight * loss["kl_divergence"]
+            + self.classifier_weight * loss["classification"]
+        )
         return loss
 
     def training_step(self, batch, batch_idx, dataloader_idx=0):
@@ -163,7 +181,9 @@ class AutoencoderLM(LightningModule):
             )
 
         if self.global_rank == 0 and len(self.results) < 16:
-            self.results.append((images[0].unsqueeze_(0), output_images[0].unsqueeze_(0)))
+            self.results.append(
+                (images[0].unsqueeze_(0), output_images[0].unsqueeze_(0))
+            )
 
     def on_validation_epoch_end(self):
         if self.global_rank != 0:
@@ -175,7 +195,7 @@ class AutoencoderLM(LightningModule):
         images = torch.cat([r[0] for r in self.results])
         output_images = torch.cat([r[1] for r in self.results])
         self.results = []
-    
+
         pro = combine_images(images[:16, 0], output_images[:16, 0])
         nuc = combine_images(images[:16, 1], output_images[:16, 1])
 
@@ -196,7 +216,7 @@ class AutoencoderLM(LightningModule):
             )
 
     def configure_optimizers(self):
-        params = list(self.vae.parameters())  # + list(self.classifier.parameters())
+        params = list(self.vae.parameters()) + list(self.classifier.parameters())
 
         optimizer = optim.AdamW(
             params,
@@ -206,11 +226,7 @@ class AutoencoderLM(LightningModule):
             weight_decay=self.optim_config.weight_decay,
         )
 
-        self.lr_scheduler = get_cosine_schedule_with_warmup(
-            optimizer,
-            num_warmup_steps=self.optim_config.warmup,
-            num_training_steps=self.optim_config.max_iters,
-        )
+        self.lr_scheduler = CosineAnnealingLR(optimizer, T_max=self.optim_config.max_iters, eta_min= self.optim_config.learning_rate_min_factore * self.optim_config.learning_rate)
 
         return {
             "optimizer": optimizer,

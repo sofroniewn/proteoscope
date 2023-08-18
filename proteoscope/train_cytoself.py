@@ -42,10 +42,10 @@ def train_cytoself(config: ProteoscopeConfig) -> None:
     if config.trainer.num_devices > 1:
         strategy = "ddp_find_unused_parameters_true"
     else:
-        strategy = 'auto'
+        strategy = "auto"
 
     trainer = Trainer(
-        max_epochs=config.trainer.max_epochs,
+        max_steps=config.module.optimizer.max_iters,
         check_val_every_n_epoch=None,  # config.trainer.check_val_every_n_epoch,
         val_check_interval=config.trainer.val_check_interval,  # 1000,
         limit_val_batches=config.trainer.limit_val_batches,  # 20,
