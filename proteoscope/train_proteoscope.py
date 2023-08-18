@@ -39,7 +39,7 @@ def train_proteoscope(config: ProteoscopeConfig) -> None:
         strategy = "auto"
 
     trainer = Trainer(
-        max_epochs=config.trainer.max_epochs,
+        max_steps=config.module.optimizer.max_iters,
         check_val_every_n_epoch=None,  # config.trainer.check_val_every_n_epoch,
         val_check_interval=config.trainer.val_check_interval,  # 1000,
         limit_val_batches=config.trainer.limit_val_batches,  # 20,

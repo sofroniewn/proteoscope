@@ -140,11 +140,13 @@ class ProteoscopeLM(LightningModule):
         )
 
         if self.global_rank == 0 and len(self.results) < 16:
-            self.results.append((
-                batch["image"][0].unsqueeze_(0),
-                batch["sequence_embed"][0].unsqueeze_(0),
-                batch["sequence_mask"][0].unsqueeze_(0),
-            ))
+            self.results.append(
+                (
+                    batch["image"][0].unsqueeze_(0),
+                    batch["sequence_embed"][0].unsqueeze_(0),
+                    batch["sequence_mask"][0].unsqueeze_(0),
+                )
+            )
 
     def on_validation_epoch_end(self):
         if self.global_rank != 0:

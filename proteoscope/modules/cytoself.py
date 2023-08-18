@@ -1,8 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from cytoself.trainer.autoencoder.cytoselffull import (CytoselfFull,
-                                                       default_block_args)
+from cytoself.trainer.autoencoder.cytoselffull import CytoselfFull, default_block_args
 from diffusers.optimization import get_cosine_schedule_with_warmup
 from omegaconf import OmegaConf
 from pytorch_lightning import LightningModule

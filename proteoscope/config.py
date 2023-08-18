@@ -46,8 +46,10 @@ class AutoencoderModelConfig:
     latent_channels: int
     down_block_types: Tuple[str]
     up_block_types: Tuple[str]
-    classifier_coeff: float
-    kl_coeff: float
+    classifier_weight: float
+    kl_weight: float
+    perceptual_weight: float
+    pixel_weight: float
 
 
 @dataclass
@@ -90,6 +92,7 @@ class OptimizerConfig:
     weight_decay: float
     warmup: int
     max_iters: int
+    learning_rate_min_factore: float
 
 
 @dataclass
@@ -106,7 +109,6 @@ class TrainerConfig:
     device: str
     precision: str
     num_devices: int
-    max_epochs: int
     val_check_interval: int
     limit_val_batches: int
     log_every_n_steps: int
