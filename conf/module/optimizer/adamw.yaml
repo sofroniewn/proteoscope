@@ -5,4 +5,4 @@ beta_2: 0.98
 eps: 0.00000001 # 1e-8
 weight_decay: 0.01
 warmup: 200
-max_iters: 60_000
+max_iters: 90_000

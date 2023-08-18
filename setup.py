@@ -16,9 +16,9 @@ requirements = [
     "zarr",
     "diffusers",
     "piqa",
-    "torch-fidelity"
-    "cytoself @ git+https://github.com/royerlab/cytoself.git",
+    "torch-fidelity",
     'seaborn_image',
+    "cytoself @ git+https://github.com/royerlab/cytoself.git",
 ]
 
 test_requirements = ["pytest>=3"]

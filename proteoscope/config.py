@@ -114,6 +114,7 @@ class TrainerConfig:
     log_every_n_steps: int
     batch_size: int
     num_workers: int
+    max_steps: int
     gradient_clip_val: Optional[float]
 
 
