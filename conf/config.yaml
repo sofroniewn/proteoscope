@@ -9,7 +9,7 @@ hydra:
     dir: /home/ec2-user/outputs/proteoscope/${now:%Y-%m-%d}/${now:%H-%M-%S}
 
 model_type: proteoscope #cytoself proteoscope autoencoder
-chkpt: null #/home/ec2-user/outputs/autoencoder/2023-08-16/20-28-32/checkpoints/last.ckpt # null
+chkpt: null # /home/ec2-user/outputs/proteoscope/2023-08-18/16-03-17/checkpoints/last.ckpt # null
 module:
   image_variance: 0.0167
   dropout: 0.2
