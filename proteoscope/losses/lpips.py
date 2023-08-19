@@ -83,6 +83,10 @@ class ScalingLayer(nn.Module):
         self.register_buffer('scale', torch.Tensor([.458, .448, .450])[None, :, None, None])
 
     def forward(self, inp):
+        if inp.shape[1] == 2:
+            shape = list(inp.shape)
+            shape[1] = 1
+            inp = torch.cat([inp, torch.zeros(shape).to(inp)], dim=1)
         return (inp - self.shift) / self.scale
 
 

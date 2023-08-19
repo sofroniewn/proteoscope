@@ -38,6 +38,15 @@ class CytoselfModelConfig:
 
 
 @dataclass
+class LPIPSWithDiscriminatorConfig:
+    classifier_weight: float
+    kl_weight: float
+    perceptual_weight: float
+    pixel_weight: float
+    disc_start: int
+
+
+@dataclass
 class AutoencoderModelConfig:
     in_channels: int
     out_channels: int
@@ -46,10 +55,7 @@ class AutoencoderModelConfig:
     latent_channels: int
     down_block_types: Tuple[str]
     up_block_types: Tuple[str]
-    classifier_weight: float
-    kl_weight: float
-    perceptual_weight: float
-    pixel_weight: float
+    loss: LPIPSWithDiscriminatorConfig
 
 
 @dataclass
@@ -92,7 +98,7 @@ class OptimizerConfig:
     weight_decay: float
     warmup: int
     max_iters: int
-    learning_rate_min_factore: float
+    learning_rate_min_factor: float
 
 
 @dataclass

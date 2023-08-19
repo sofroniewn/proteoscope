@@ -1,11 +1,11 @@
 device: cuda
 num_devices: 4 #8
 gradient_clip_val: null
-precision: 16 # 16
-val_check_interval: 2400 # 1000
+precision: 16-mixed # 16
+val_check_interval: 600 # 1000
 limit_val_batches: 50 # 20
 log_every_n_steps: 10 # 50
-batch_size: 16
+batch_size: 32
 num_workers: 16
-accumulate: 4
-max_steps: 45_000
+accumulate: 1
+max_steps: 240_000

@@ -5,7 +5,10 @@ block_out_channels: [128, 256, 512]
 latent_channels: 4
 down_block_types: ['DownEncoderBlock2D', 'DownEncoderBlock2D', 'DownEncoderBlock2D']
 up_block_types: ['UpDecoderBlock2D', 'UpDecoderBlock2D', 'UpDecoderBlock2D']
-classifier_weight: 0.1
-kl_weight: 1e-7
-perceptual_weight: 4.0
-pixel_weight: 1.0
+loss:
+  classifier_weight: 0.1
+  kl_weight: 1e-7
+  perceptual_weight: 2.0
+  pixel_weight: 1.0
+  disc_weight: 1.0
+  disc_start: 2400

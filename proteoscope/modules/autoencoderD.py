@@ -8,7 +8,7 @@ from piqa import SSIM
 from pytorch_lightning import LightningModule
 # from torchvision.ops import MLP
 # from torchmetrics.image.lpip import LearnedPerceptualImagePatchSimilarity
-from ldm.modules.losses import LPIPSWithDiscriminator
+from ..losses import LPIPSWithDiscriminator
 
 
 def combine_images(img_set1, img_set2):
@@ -41,8 +41,10 @@ class AutoencoderLM(LightningModule):
             pixelloss_weight=module_config.model.loss.pixel_weight,
             perceptual_weight=module_config.model.loss.perceptual_weight,
             disc_weight=module_config.model.loss.disc_weight,
+            disc_in_channels=module_config.model.out_channels
         )
-
+        self.automatic_optimization = False
+        
         # height = module_config.image_height / (
         #     2 ** (len(module_config.model.block_out_channels) - 1)
         # )
@@ -84,59 +86,68 @@ class AutoencoderLM(LightningModule):
         else:
             return reconstructed, posterior
 
-    def training_step(self, batch, batch_idx, optimizer_idx):
+    def training_step(self, batch, batch_idx):        
+        optimizer_ae, optimizer_disc = self.optimizers()
+        scheduler_ae, scheduler_disc = self.lr_schedulers()
+
         inputs = batch["image"]
         # labels = batch["label"]
         reconstructions, posterior = self(inputs)
 
-        if optimizer_idx == 0:
-            # train encoder+decoder+logvar
-            aeloss, log_dict_ae = self.loss(
-                inputs,
-                reconstructions,
-                posterior,
-                optimizer_idx,
-                self.global_step,
-                last_layer=self.get_last_layer(),
-                split="train",
-            )
-            self.log(
-                "aeloss",
-                aeloss,
-                prog_bar=True,
-                logger=True,
-                on_step=True,
-                on_epoch=True,
-            )
-            self.log_dict(
-                log_dict_ae, prog_bar=False, logger=True, on_step=True, on_epoch=False
-            )
-            return aeloss
+        # train encoder+decoder+logvar
+        aeloss, log_dict_ae = self.loss(
+            inputs,
+            reconstructions,
+            posterior,
+            0,
+            self.global_step,
+            last_layer=self.get_last_layer(),
+            split="train",
+        )
+        self.log(
+            "aeloss",
+            aeloss,
+            prog_bar=True,
+            logger=True,
+            on_step=True,
+            on_epoch=True,
+        )
+        self.log_dict(
+            log_dict_ae, prog_bar=False, logger=True, on_step=True, on_epoch=False
+        )
 
-        if optimizer_idx == 1:
-            # train the discriminator
-            discloss, log_dict_disc = self.loss(
-                inputs,
-                reconstructions,
-                posterior,
-                optimizer_idx,
-                self.global_step,
-                last_layer=self.get_last_layer(),
-                split="train",
-            )
+        optimizer_ae.zero_grad()
+        self.manual_backward(aeloss)
+        optimizer_ae.step()
+        scheduler_ae.step()
 
-            self.log(
-                "discloss",
-                discloss,
-                prog_bar=True,
-                logger=True,
-                on_step=True,
-                on_epoch=True,
-            )
-            self.log_dict(
-                log_dict_disc, prog_bar=False, logger=True, on_step=True, on_epoch=False
-            )
-            return discloss
+        # train the discriminator
+        discloss, log_dict_disc = self.loss(
+            inputs,
+            reconstructions,
+            posterior,
+            1,
+            self.global_step,
+            last_layer=self.get_last_layer(),
+            split="train",
+        )
+
+        self.log(
+            "discloss",
+            discloss,
+            prog_bar=True,
+            logger=True,
+            on_step=True,
+            on_epoch=True,
+        )
+        self.log_dict(
+            log_dict_disc, prog_bar=False, logger=True, on_step=True, on_epoch=False
+        )
+        
+        optimizer_disc.zero_grad()
+        self.manual_backward(discloss)
+        optimizer_disc.step()
+        scheduler_disc.step()
 
     def validation_step(self, batch, batch_idx):
         inputs = batch["image"]
@@ -189,8 +200,29 @@ class AutoencoderLM(LightningModule):
             sync_dist=True,
         )
 
+        ssim_score = {}
+        ssim_score["ssim_pro"] = self.ssim(
+            inputs[:, 0].unsqueeze_(1),
+            torch.clip(reconstructions[:, 0].unsqueeze_(1), 0, 1),
+        )
+        ssim_score["ssim_nuc"] = self.ssim(
+            inputs[:, 1].unsqueeze_(1),
+            torch.clip(reconstructions[:, 1].unsqueeze_(1), 0, 1),
+        )
+
+        for key, value in ssim_score.items():
+            self.log(
+                "val_" + key,
+                value,
+                on_step=False,
+                on_epoch=True,
+                prog_bar=True,
+                logger=True,
+                sync_dist=True,
+            )
+
         if self.global_rank == 0 and len(self.results) < 16:
-            self.results.append((inputs[0].unsqueeze_(0), inputs[0].unsqueeze_(0)))
+            self.results.append((inputs[0].unsqueeze_(0), reconstructions[0].unsqueeze_(0)))
         return self.log_dict
 
     def on_validation_epoch_end(self):
@@ -242,31 +274,37 @@ class AutoencoderLM(LightningModule):
             weight_decay=self.optim_config.weight_decay,
         )
 
-        lr_scheduler = CosineAnnealingLR(
-            [optimizer_ae, optimizer_disc],
+        lr_scheduler_ae = CosineAnnealingLR(
+            optimizer_ae,
             T_max=self.optim_config.max_iters,
             eta_min=self.optim_config.learning_rate_min_factor
             * self.optim_config.learning_rate,
         )
 
+        lr_scheduler_disc = CosineAnnealingLR(
+            optimizer_disc,
+            T_max=self.optim_config.max_iters,
+            eta_min=self.optim_config.learning_rate_min_factor
+            * self.optim_config.learning_rate,
+        )
         return (
             {
                 "optimizer": optimizer_ae,
                 "lr_scheduler": {
-                    "scheduler": lr_scheduler,
+                    "scheduler": lr_scheduler_ae,
                     "interval": "step",
                 },
             },
             {
                 "optimizer": optimizer_disc,
                 "lr_scheduler": {
-                    "scheduler": lr_scheduler,
+                    "scheduler": lr_scheduler_disc,
                     "interval": "step",
                 },
             },
         )
 
-    def optimizer_step(self, *args, **kwargs):
-        super().optimizer_step(*args, **kwargs)
-        self.lr_scheduler_ae.step()  # Step per iteration
-        self.lr_scheduler_disc.step()  # Step per iteration
+    # def optimizer_step(self, *args, **kwargs):
+    #     super().optimizer_step(*args, **kwargs)
+    #     self.lr_scheduler_ae.step()  # Step per iteration
+    #     self.lr_scheduler_disc.step()  # Step per iteration

@@ -1,13 +1,13 @@
 import torch
 import torch.nn.functional as F
 import torch.optim as optim
-from diffusers import DDPMScheduler, UNet2DConditionModel
+from diffusers import DDIMScheduler, UNet2DConditionModel
 from diffusers.optimization import get_cosine_schedule_with_warmup
 from piqa import SSIM
 from pytorch_lightning import LightningModule
 from tqdm.auto import tqdm
 
-from .autoencoder import AutoencoderLM
+from .autoencoderD import AutoencoderLM
 
 
 def combine_images(img_set1, img_set2):
@@ -44,7 +44,7 @@ class ProteoscopeLM(LightningModule):
 
         self.cond_images = module_config.model.cond_images
 
-        self.noise_scheduler = DDPMScheduler(
+        self.noise_scheduler = DDIMScheduler(
             num_train_timesteps=module_config.model.num_train_timesteps
         )
 

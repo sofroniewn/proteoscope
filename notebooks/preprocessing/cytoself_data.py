@@ -1,6 +1,9 @@
 import gdown
+import os
 
 BASE_PATH = "/home/ec2-user/cytoself-data/"
+
+os.makedirs(BASE_PATH, exist_ok=True)
 
 data_links = {
     "Image_data00.npy": "https://drive.google.com/file/d/15_CHBPT-p5JG44acP6D2hKd8jAacZatp/view?usp=sharing",
