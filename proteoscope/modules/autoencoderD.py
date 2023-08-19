@@ -78,7 +78,7 @@ class AutoencoderLM(LightningModule):
         else:
             z = posterior.mode()
 
-        reconstructed = self.vae.decode(z).sample
+        reconstructed = self.vae.decode(z).sample.clip(0, 1)
         # logits = self.classifier(z.reshape(z.shape[0], -1))
 
         if return_embed:

@@ -7,7 +7,7 @@ down_block_types: ['DownEncoderBlock2D', 'DownEncoderBlock2D', 'DownEncoderBlock
 up_block_types: ['UpDecoderBlock2D', 'UpDecoderBlock2D', 'UpDecoderBlock2D']
 loss:
   classifier_weight: 0.1
-  kl_weight: 1e-7
+  kl_weight: 1e-6
   perceptual_weight: 2.0
   pixel_weight: 1.0
   disc_weight: 1.0
