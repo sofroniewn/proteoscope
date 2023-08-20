@@ -45,7 +45,8 @@ class ProteoscopeLM(LightningModule):
         self.cond_images = module_config.model.cond_images
 
         self.noise_scheduler = DDIMScheduler(
-            num_train_timesteps=module_config.model.num_train_timesteps
+            num_train_timesteps=module_config.model.num_train_timesteps,
+            clip_sample=False,
         )
 
         self.optim_config = module_config.optimizer
@@ -68,6 +69,12 @@ class ProteoscopeLM(LightningModule):
         seq_embeds = batch["sequence_embed"]
         seq_mask = batch["sequence_mask"]
 
+        if self.latents_init_scale is None:
+            with torch.no_grad():
+                first_batch_latents = self.autoencoder.encode(batch["image"]).latent_dist.mode()
+                latent_init_mean = first_batch_latents.mean()
+                self.latents_init_scale = (first_batch_latents - latent_init_mean).pow(2).mean().pow(0.5)
+
         if torch.rand(1) < self.unconditioned_probability:
             seq_embeds = torch.zeros_like(seq_embeds)
 
@@ -79,12 +86,12 @@ class ProteoscopeLM(LightningModule):
 
         with torch.no_grad():
             latents = (
-                self.autoencoder.encode(batch["image"]).latent_dist.mean
+                self.autoencoder.encode(batch["image"]).latent_dist.sample()
                 / self.latents_init_scale
             )
             if cond_images is not None:
                 latents_cond = (
-                    self.autoencoder.encode(cond_images).latent_dist.mean
+                    self.autoencoder.encode(cond_images).latent_dist.sample()
                     / self.latents_init_scale
                 )
             else:
@@ -235,7 +242,7 @@ class ProteoscopeLM(LightningModule):
         if cond_images is not None:
             with torch.no_grad():
                 latents_cond = (
-                    self.autoencoder.encode(cond_images).latent_dist.mean
+                    self.autoencoder.encode(cond_images).latent_dist.mode()
                     / self.latents_init_scale
                 )
                 latents_cond = torch.cat([latents_cond] * 2)
@@ -280,7 +287,7 @@ class ProteoscopeLM(LightningModule):
             # compute the previous noisy sample x_t -> x_t-1
             latents = self.noise_scheduler.step(noise_pred, t, latents).prev_sample
 
-        return latents * self.latents_init_scale
+        return latents  * self.latents_init_scale
 
     def configure_optimizers(self):
         params = self.unet.parameters()
