@@ -1,7 +1,7 @@
 import torch
 import torch.nn.functional as F
 import torch.optim as optim
-from diffusers import DDIMScheduler, UNet2DConditionModel
+from diffusers import DDPMScheduler, UNet2DConditionModel
 from diffusers.optimization import get_cosine_schedule_with_warmup
 from piqa import SSIM
 from pytorch_lightning import LightningModule
@@ -44,7 +44,7 @@ class ProteoscopeLM(LightningModule):
 
         self.cond_images = module_config.model.cond_images
 
-        self.noise_scheduler = DDIMScheduler(
+        self.noise_scheduler = DDPMScheduler(
             num_train_timesteps=module_config.model.num_train_timesteps,
             clip_sample=False,
         )
@@ -178,7 +178,7 @@ class ProteoscopeLM(LightningModule):
             guidance_scale=self.guidance_scale,
             num_inference_steps=num_inference_steps,
         )
-        output_images = self.autoencoder.decode(output_latents).sample
+        output_images = self.autoencoder.decode(output_latents).sample.clip(0, 1)
 
         pro = combine_images(images[:, 0], output_images[:, 0])
         nuc = combine_images(images[:, 1], output_images[:, 1])
@@ -287,7 +287,7 @@ class ProteoscopeLM(LightningModule):
             # compute the previous noisy sample x_t -> x_t-1
             latents = self.noise_scheduler.step(noise_pred, t, latents).prev_sample
 
-        return latents  * self.latents_init_scale
+        return latents * self.latents_init_scale
 
     def configure_optimizers(self):
         params = self.unet.parameters()
