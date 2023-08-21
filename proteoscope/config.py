@@ -4,6 +4,16 @@ from typing import Optional, Tuple, Union
 
 
 @dataclass
+class SplitsConfig:
+    train_protein: str
+    train_images: str
+    val_protein: str
+    val_images: str
+    test_protein: str
+    test_images: str
+
+
+@dataclass
 class DataConfig:
     images_path: str
     labels_path: str
@@ -35,6 +45,7 @@ class CytoselfModelConfig:
     num_class: Optional[int]
     vq_coeff: int
     fc_coeff: int
+    image_variance: float
 
 
 @dataclass
@@ -105,7 +116,6 @@ class OptimizerConfig:
 class ModuleConfig:
     model: Union[CytoselfModelConfig, AutoencoderModelConfig, ProteoscopeModelConfig]
     optimizer: OptimizerConfig
-    image_variance: float
     dropout: float
     image_height: int
 
@@ -129,4 +139,5 @@ class ProteoscopeConfig:
     data: DataConfig
     module: ModuleConfig
     trainer: TrainerConfig
+    splits: SplitsConfig
     model_type: str

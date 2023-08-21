@@ -11,3 +11,4 @@ fc_input_type: 'vqvec'
 num_class: null
 vq_coeff: 1.0
 fc_coeff: 1.0
+image_variance: 0.0167

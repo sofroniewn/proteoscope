@@ -17,6 +17,7 @@ class ProteoscopeDM(LightningDataModule):
         labels_path: str,
         batch_size: int,
         num_workers: int,
+        splits,
         sequences_path: Optional[str] = None,
         trim: Optional[int] = None,
         sequence_embedding: Optional[str] = None,
@@ -30,6 +31,7 @@ class ProteoscopeDM(LightningDataModule):
         self.num_workers = num_workers
         self.trim = trim
         self.sequence_embedding = sequence_embedding
+        self.splits = splits
 
     def prepare_data(self):
         pass
@@ -48,31 +50,18 @@ class ProteoscopeDM(LightningDataModule):
             images=self.images,
             labels=self.labels,
             sequences=self.sequences,
-            split_protein="train",
-            split_images="train",
+            split_protein=self.splits.train_protein,
+            split_images=self.splits.train_images,
             trim=self.trim,
             sequence_embedding=self.sequence_embedding,
         )
 
-        self.val_images_dataset = ProteoscopeDataset(
+        self.val_dataset = ProteoscopeDataset(
             images=self.images,
             labels=self.labels,
             sequences=self.sequences,
-            split_protein="train",
-            split_images="val",
-            transform=None,
-            trim=self.trim,
-            sequence_embedding=self.sequence_embedding,
-        )
-
-        self.val_proteins_dataset = ProteoscopeDataset(
-            images=self.images,
-            labels=self.labels,
-            sequences=self.sequences,
-            split_protein="val",
-            split_images="val",
-            transform=None,
-            unique_protein=False,
+            split_protein=self.splits.val_protein,
+            split_images=self.splits.val_images,
             trim=self.trim,
             sequence_embedding=self.sequence_embedding,
         )
@@ -99,15 +88,11 @@ class ProteoscopeDM(LightningDataModule):
             pin_memory=True,
         )
 
-    def val_dataloader(self, novel_proteins=False, shuffle=False):
-        if novel_proteins:
-            dataset = self.val_proteins_dataset
-        else:
-            dataset = self.val_images_dataset
+    def val_dataloader(self):
         return DataLoader(
-            dataset,
+            self.val_dataset,
             batch_size=self.batch_size,
-            shuffle=shuffle,
+            shuffle=False,
             num_workers=self.num_workers,
             pin_memory=True,
         )
@@ -120,6 +105,30 @@ class ProteoscopeDM(LightningDataModule):
             num_workers=self.num_workers,
             pin_memory=True,
         )
+
+    def custom_dataloader(self, split_protein=None, split_images=None, unique_protein=False, shuffle=False, batch_size=None):
+        dataset = ProteoscopeDataset(
+            images=self.images,
+            labels=self.labels,
+            sequences=self.sequences,
+            split_protein=split_protein,
+            split_images=split_images,
+            unique_protein=unique_protein,
+            transform=None,
+            trim=self.trim,
+            sequence_embedding=self.sequence_embedding,
+        )
+        if batch_size is None:
+            batch_size = self.batch_size
+        
+        return DataLoader(
+            dataset,
+            batch_size=batch_size,
+            shuffle=shuffle,
+            num_workers=self.num_workers,
+            pin_memory=True,
+        )
+
 
     def teardown(self, stage=None):
         pass

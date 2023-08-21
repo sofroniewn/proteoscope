@@ -25,7 +25,7 @@ def train_proteoscope(config: ProteoscopeConfig) -> None:
     )
     print(clm)
     print(
-        f"Train samples {len(pdm.train_dataset)}, Val images {len(pdm.val_images_dataset)},  Val proteins {len(pdm.val_proteins_dataset)}"
+        f"Train samples {len(pdm.train_dataset)}, Val samples {len(pdm.val_dataset)}"
     )
 
     checkpoint_callback = ModelCheckpoint(
@@ -58,5 +58,5 @@ def train_proteoscope(config: ProteoscopeConfig) -> None:
         clm,
         ckpt_path=config.chkpt,
         train_dataloaders=pdm.train_dataloader(),
-        val_dataloaders=pdm.val_dataloader(novel_proteins=True),
+        val_dataloaders=pdm.val_dataloader(),
     )

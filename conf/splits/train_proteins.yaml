@@ -1,0 +1,6 @@
+train_protein: 'train'
+train_images: 'train'
+val_protein: 'train'
+val_images: 'val'
+test_protein: 'train'
+test_images: 'test'

@@ -1,0 +1,6 @@
+train_protein: null
+train_images: 'train'
+val_protein: null
+val_images: 'val'
+test_protein: null
+test_images: 'test'

@@ -1,5 +1,5 @@
 device: cuda
-num_devices: 4 #8
+num_devices: 1 #8
 gradient_clip_val: null
 precision: 16-mixed # 16
 val_check_interval: 600 # 1000
