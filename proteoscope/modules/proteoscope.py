@@ -172,7 +172,7 @@ class ProteoscopeLM(LightningModule):
         batch["sequence_embed"] = seq_emb
         batch["sequence_mask"] = seq_mask
 
-        num_inference_steps = self.noise_scheduler.config.num_train_timesteps
+        num_inference_steps = self.noise_scheduler.config.num_train_timesteps // 5
         output_latents = self.sample(
             batch,
             guidance_scale=self.guidance_scale,

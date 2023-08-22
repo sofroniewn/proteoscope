@@ -17,6 +17,7 @@ def train_proteoscope(config: ProteoscopeConfig) -> None:
         batch_size=config.trainer.batch_size,
         num_workers=config.trainer.num_workers,
         sequence_embedding=config.data.sequence_embedding,
+        splits=config.splits,
     )
     pdm.setup()
 

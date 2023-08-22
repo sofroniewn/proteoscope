@@ -62,6 +62,7 @@ class ProteoscopeDM(LightningDataModule):
             sequences=self.sequences,
             split_protein=self.splits.val_protein,
             split_images=self.splits.val_images,
+            transform=None,
             trim=self.trim,
             sequence_embedding=self.sequence_embedding,
         )
