@@ -221,8 +221,14 @@ class ProteoscopeLM(LightningModule):
             )
 
     def sample(
-        self, batch, guidance_scale=1.0, cond_images=None, num_inference_steps=None
+        self, batch, guidance_scale=1.0, cond_images=None, num_inference_steps=None, seed=None,
     ):
+        
+        if seed is not None:
+            generator = torch.Generator(self.unet.device).manual_seed(seed)
+        else:
+            generator = None
+
         seq_embeds = batch["sequence_embed"].to(self.unet.device)
         seq_mask = batch["sequence_mask"].to(self.unet.device)
 
@@ -237,7 +243,7 @@ class ProteoscopeLM(LightningModule):
         latents_shape = (bs,) + self.latents_shape
 
         # Initialize latents
-        latents = torch.randn(latents_shape).to(self.unet.device)
+        latents = torch.randn(latents_shape, generator=generator, device=self.unet.device)
 
         if cond_images is not None:
             with torch.no_grad():
