@@ -64,6 +64,7 @@ class ProteoscopeDM(LightningDataModule):
             split_images=self.splits.val_images,
             transform=None,
             trim=self.trim,
+            shuffle=True,
             sequence_embedding=self.sequence_embedding,
         )
 

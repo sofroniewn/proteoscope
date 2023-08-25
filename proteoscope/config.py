@@ -92,6 +92,7 @@ class ProteoscopeModelConfig:
     up_block_types: Tuple[str]
     cross_attention_dim: int
     num_train_timesteps: int
+    num_val_timesteps: int
     cond_images: bool
     unconditioned_probability: float
     latents_init_scale: float

@@ -6,8 +6,9 @@ from torch.optim.lr_scheduler import CosineAnnealingLR
 from omegaconf import OmegaConf
 from piqa import SSIM
 from pytorch_lightning import LightningModule
-from torchvision.ops import MLP
-from torchmetrics.image.lpip import LearnedPerceptualImagePatchSimilarity
+# from torchvision.ops import MLP
+# from torchmetrics.image.lpip import LearnedPerceptualImagePatchSimilarity
+from ..losses import LPIPSWithDiscriminator
 
 
 def combine_images(img_set1, img_set2):
@@ -34,139 +35,179 @@ class AutoencoderLM(LightningModule):
             up_block_types=module_config.model.up_block_types,
         )
 
-        self.image_variance = module_config.image_variance
-        self.classifier_weight = module_config.model.classifier_weight
-        self.kl_weight = module_config.model.kl_weight
-        self.perceptual_weight = module_config.model.perceptual_weight
-        self.pixel_weight = module_config.model.pixel_weight
-
-        height = module_config.image_height / (
-            2 ** (len(module_config.model.block_out_channels) - 1)
+        self.loss = LPIPSWithDiscriminator(
+            module_config.model.loss.disc_start,
+            kl_weight=module_config.model.loss.kl_weight,
+            pixelloss_weight=module_config.model.loss.pixel_weight,
+            perceptual_weight=module_config.model.loss.perceptual_weight,
+            disc_weight=module_config.model.loss.disc_weight,
+            disc_in_channels=module_config.model.out_channels
         )
-        in_channels = int(module_config.model.latent_channels * height * height)
-        self.classifier = MLP(
-            in_channels,
-            [in_channels * 2, module_config.num_class],
-            dropout=module_config.dropout,
-            inplace=False,
-        )
+        self.automatic_optimization = False
+        
+        # height = module_config.image_height / (
+        #     2 ** (len(module_config.model.block_out_channels) - 1)
+        # )
+        # in_channels = int(module_config.model.latent_channels * height * height)
+        # self.classifier = MLP(
+        #     in_channels,
+        #     [in_channels * 2, module_config.num_class],
+        #     dropout=module_config.dropout,
+        #     inplace=False,
+        # )
 
         self.optim_config = module_config.optimizer
 
-        self.image_criterion = nn.L1Loss()
-        self.perceptual_criterion = LearnedPerceptualImagePatchSimilarity(
-            net_type="vgg"
-        )
-        self.labels_criterion = nn.CrossEntropyLoss()
+        # self.image_criterion = nn.L1Loss()
+        # self.perceptual_criterion = LearnedPerceptualImagePatchSimilarity(
+        #     net_type="vgg"
+        # )
+        # self.labels_criterion = nn.CrossEntropyLoss()
 
         self.ssim = SSIM(n_channels=1)
         self.results = []
 
-    def encode(self, images):
-        latent_dist = self.vae.encode(images).latent_dist
-        return latent_dist.mean
+    def get_last_layer(self):
+        return self.vae.decoder.conv_out.weight
 
-    def sample(self, images, return_embed=False):
-        latent_dist = self.vae.encode(images).latent_dist
-        mu = latent_dist.mean
-        reconstructed = self.vae.decode(mu).sample
-        if return_embed:
-            return reconstructed, mu
+    def forward(self, images, sample_posterior=True, return_embed=False):
+        posterior = self.vae.encode(images).latent_dist
+
+        if sample_posterior:
+            z = posterior.sample()
         else:
-            return reconstructed
+            z = posterior.mode()
 
-    def forward(self, images):
-        latent_dist = self.vae.encode(images).latent_dist
-        mu, logvar = latent_dist.mean, latent_dist.logvar
+        reconstructed = self.vae.decode(z).sample.clip(0, 1)
+        # logits = self.classifier(z.reshape(z.shape[0], -1))
 
-        # Reparameterization trick
-        std = torch.exp(logvar / 2)
-        eps = torch.randn_like(std)
-        z = mu + eps * std
+        if return_embed:
+            return reconstructed, posterior, z
+        else:
+            return reconstructed, posterior
 
-        reconstructed = self.vae.decode(z).sample
-        logits = self.classifier(mu.reshape(mu.shape[0], -1))
+    def training_step(self, batch, batch_idx):        
+        optimizer_ae, optimizer_disc = self.optimizers()
+        scheduler_ae, scheduler_disc = self.lr_schedulers()
 
-        return reconstructed, mu, logvar, logits
+        inputs = batch["image"]
+        # labels = batch["label"]
+        reconstructions, posterior = self(inputs)
 
-    def _calc_losses(
-        self, images, labels, output_images, output_mu, output_logvar, output_logits
-    ):
-        loss = {}
-
-        loss["kl_divergence"] = -0.5 * torch.sum(
-            1 + output_logvar - output_mu.pow(2) - output_logvar.exp()
+        # train encoder+decoder+logvar
+        aeloss, log_dict_ae = self.loss(
+            inputs,
+            reconstructions,
+            posterior,
+            0,
+            self.global_step,
+            last_layer=self.get_last_layer(),
+            split="train",
+        )
+        self.log(
+            "aeloss",
+            aeloss,
+            prog_bar=True,
+            logger=True,
+            on_step=True,
+            on_epoch=True,
+        )
+        self.log_dict(
+            log_dict_ae, prog_bar=False, logger=True, on_step=True, on_epoch=False
         )
 
-        loss["pixel"] = self.image_criterion(output_images, images)
+        optimizer_ae.zero_grad()
+        self.manual_backward(aeloss)
+        optimizer_ae.step()
+        scheduler_ae.step()
 
-        loss["perceptual_pro"] = self.perceptual_criterion(
-            output_images[:, 0].clip(0, 1).unsqueeze(1).tile(1, 3, 1, 1),
-            images[:, 0].unsqueeze(1).tile(1, 3, 1, 1),
-        )
-        loss["perceptual_nuc"] = self.perceptual_criterion(
-            output_images[:, 1].clip(0, 1).unsqueeze(1).tile(1, 3, 1, 1),
-            images[:, 1].unsqueeze(1).tile(1, 3, 1, 1),
-        )
-
-        loss['classification'] = self.labels_criterion(output_logits, labels)
-
-        loss["loss"] = (
-            self.pixel_weight * loss["pixel"]
-            + self.perceptual_weight * (loss["perceptual_pro"] + loss["perceptual_nuc"]) / 2
-            + self.kl_weight * loss["kl_divergence"]
-            + self.classifier_weight * loss["classification"]
-        )
-        return loss
-
-    def training_step(self, batch, batch_idx, dataloader_idx=0):
-        images = batch["image"]
-        labels = batch["label"]
-        output_images, output_mu, output_logvar, output_logits = self(images)
-
-        loss = self._calc_losses(
-            images, labels, output_images, output_mu, output_logvar, output_logits
+        # train the discriminator
+        discloss, log_dict_disc = self.loss(
+            inputs,
+            reconstructions,
+            posterior,
+            1,
+            self.global_step,
+            last_layer=self.get_last_layer(),
+            split="train",
         )
 
-        for key, value in loss.items():
-            self.log(
-                "train_" + key,
-                value,
-                on_step=True,
-                on_epoch=False,
-                prog_bar=True,
-                logger=True,
-            )
+        self.log(
+            "discloss",
+            discloss,
+            prog_bar=True,
+            logger=True,
+            on_step=True,
+            on_epoch=True,
+        )
+        self.log_dict(
+            log_dict_disc, prog_bar=False, logger=True, on_step=True, on_epoch=False
+        )
+        
+        optimizer_disc.zero_grad()
+        self.manual_backward(discloss)
+        optimizer_disc.step()
+        scheduler_disc.step()
 
-        return loss["loss"]
+    def validation_step(self, batch, batch_idx):
+        inputs = batch["image"]
+        # labels = batch["label"]
+        reconstructions, posterior = self(inputs)
 
-    def validation_step(self, batch, batch_idx, dataloader_idx=0):
-        images = batch["image"]
-        labels = batch["label"]
-        output_images, output_mu, output_logvar, output_logits = self(images)
-        loss = self._calc_losses(
-            images, labels, output_images, output_mu, output_logvar, output_logits
+        aeloss, log_dict_ae = self.loss(
+            inputs,
+            reconstructions,
+            posterior,
+            0,
+            self.global_step,
+            last_layer=self.get_last_layer(),
+            split="val",
         )
 
-        for key, value in loss.items():
-            self.log(
-                "val_" + key,
-                value,
-                on_step=False,
-                on_epoch=True,
-                prog_bar=True,
-                logger=True,
-                sync_dist=True,
-            )
+        discloss, log_dict_disc = self.loss(
+            inputs,
+            reconstructions,
+            posterior,
+            1,
+            self.global_step,
+            last_layer=self.get_last_layer(),
+            split="val",
+        )
+
+        self.log(
+            "val_loss",
+            log_dict_ae["val/rec_loss"],
+            on_step=False,
+            on_epoch=True,
+            prog_bar=True,
+            logger=True,
+            sync_dist=True,
+        )
+        self.log_dict(
+            log_dict_ae,
+            on_step=False,
+            on_epoch=True,
+            prog_bar=False,
+            logger=True,
+            sync_dist=True,
+        )
+        self.log_dict(
+            log_dict_disc,
+            on_step=False,
+            on_epoch=True,
+            prog_bar=False,
+            logger=True,
+            sync_dist=True,
+        )
 
         ssim_score = {}
         ssim_score["ssim_pro"] = self.ssim(
-            images[:, 0].unsqueeze_(1),
-            torch.clip(output_images[:, 0].unsqueeze_(1), 0, 1),
+            inputs[:, 0].unsqueeze_(1),
+            torch.clip(reconstructions[:, 0].unsqueeze_(1), 0, 1),
         )
         ssim_score["ssim_nuc"] = self.ssim(
-            images[:, 1].unsqueeze_(1),
-            torch.clip(output_images[:, 1].unsqueeze_(1), 0, 1),
+            inputs[:, 1].unsqueeze_(1),
+            torch.clip(reconstructions[:, 1].unsqueeze_(1), 0, 1),
         )
 
         for key, value in ssim_score.items():
@@ -181,9 +222,8 @@ class AutoencoderLM(LightningModule):
             )
 
         if self.global_rank == 0 and len(self.results) < 16:
-            self.results.append(
-                (images[0].unsqueeze_(0), output_images[0].unsqueeze_(0))
-            )
+            self.results.append((inputs[0].unsqueeze_(0), reconstructions[0].unsqueeze_(0)))
+        return self.log_dict
 
     def on_validation_epoch_end(self):
         if self.global_rank != 0:
@@ -216,26 +256,55 @@ class AutoencoderLM(LightningModule):
             )
 
     def configure_optimizers(self):
-        params = list(self.vae.parameters()) + list(self.classifier.parameters())
+        params_ae = list(self.vae.parameters())
+        params_disc = list(self.loss.discriminator.parameters())
 
-        optimizer = optim.AdamW(
-            params,
+        optimizer_ae = optim.AdamW(
+            params_ae,
+            lr=self.optim_config.learning_rate,
+            betas=(self.optim_config.beta_1, self.optim_config.beta_2),
+            eps=self.optim_config.eps,
+            weight_decay=self.optim_config.weight_decay,
+        )
+        optimizer_disc = optim.AdamW(
+            params_disc,
             lr=self.optim_config.learning_rate,
             betas=(self.optim_config.beta_1, self.optim_config.beta_2),
             eps=self.optim_config.eps,
             weight_decay=self.optim_config.weight_decay,
         )
 
-        self.lr_scheduler = CosineAnnealingLR(optimizer, T_max=self.optim_config.max_iters, eta_min= self.optim_config.learning_rate_min_factore * self.optim_config.learning_rate)
+        lr_scheduler_ae = CosineAnnealingLR(
+            optimizer_ae,
+            T_max=self.optim_config.max_iters,
+            eta_min=self.optim_config.learning_rate_min_factor
+            * self.optim_config.learning_rate,
+        )
 
-        return {
-            "optimizer": optimizer,
-            "lr_scheduler": {
-                "scheduler": self.lr_scheduler,
-                "interval": "step",  # 'step' since you're updating per batch/iteration
+        lr_scheduler_disc = CosineAnnealingLR(
+            optimizer_disc,
+            T_max=self.optim_config.max_iters,
+            eta_min=self.optim_config.learning_rate_min_factor
+            * self.optim_config.learning_rate,
+        )
+        return (
+            {
+                "optimizer": optimizer_ae,
+                "lr_scheduler": {
+                    "scheduler": lr_scheduler_ae,
+                    "interval": "step",
+                },
             },
-        }
+            {
+                "optimizer": optimizer_disc,
+                "lr_scheduler": {
+                    "scheduler": lr_scheduler_disc,
+                    "interval": "step",
+                },
+            },
+        )
 
-    def optimizer_step(self, *args, **kwargs):
-        super().optimizer_step(*args, **kwargs)
-        self.lr_scheduler.step()  # Step per iteration
+    # def optimizer_step(self, *args, **kwargs):
+    #     super().optimizer_step(*args, **kwargs)
+    #     self.lr_scheduler_ae.step()  # Step per iteration
+    #     self.lr_scheduler_disc.step()  # Step per iteration

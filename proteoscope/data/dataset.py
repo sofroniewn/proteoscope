@@ -18,6 +18,7 @@ class ProteoscopeDataset(Dataset):
         sequences=None,
         unique_protein=False,
         sequence_embedding=None,
+        shuffle=False,
         transform: Optional[Sequence] = (
             transforms.RandomApply(
                 [
@@ -61,14 +62,21 @@ class ProteoscopeDataset(Dataset):
 
         self.sequences = sequences
         self.sequence_embedding = sequence_embedding
+        if shuffle:
+            self.shuffle = np.random.permutation(len(self.labels))
+        else:
+            self.shuffle = None
 
     def __len__(self) -> int:
         return len(self.labels)
 
     def __getitem__(self, idx: int) -> Dict[str, Union[Tensor, int, str]]:
+        if self.shuffle is not None:
+            idx = self.shuffle[idx]
+
         row = self.labels.iloc[idx]
         index = row.name
-        images = self.images[index, :, :, :2]
+        images = self.images[index, :, :, :3]
         if self.trim is not None:
             images = images[self.trim : -self.trim, self.trim : -self.trim]
         images = self.transform(images)
@@ -87,7 +95,8 @@ class ProteoscopeDataset(Dataset):
         item["seq_embedding_index"] = row["seq_embedding_index"]
         item["truncation"] = row["truncation"]
         item["label"] = row.label
-        item["image"] = images.float()
+        item["image"] = images[:2].float()
+        item["nuclei_distance"] = images[2].float()
         item["localization"] = row["localization"]
         item["complex"] = row["complex"]
         item["complex_fig"] = row["complex_fig"]

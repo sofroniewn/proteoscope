@@ -1,13 +1,15 @@
 import torch
 import torch.nn.functional as F
 import torch.optim as optim
-from diffusers import DDPMScheduler, UNet2DConditionModel
+from diffusers import DDPMScheduler, DDIMScheduler, UNet2DConditionModel
 from diffusers.optimization import get_cosine_schedule_with_warmup
-from piqa import SSIM
+from piqa import SSIM, PSNR
 from pytorch_lightning import LightningModule
 from tqdm.auto import tqdm
+from torchvision.transforms.functional import resize
 
-from .autoencoderD import AutoencoderLM
+from .autoencoder import AutoencoderLM
+from .cytoself import CytoselfLM
 
 
 def combine_images(img_set1, img_set2):
@@ -40,29 +42,55 @@ class ProteoscopeLM(LightningModule):
         )
         self.unconditioned_probability = module_config.model.unconditioned_probability
         self.latents_init_scale = module_config.model.latents_init_scale
+        self.cond_latents_init_scale = module_config.model.cond_latents_init_scale
         self.guidance_scale = module_config.model.guidance_scale
-
+        self.num_val_timesteps = module_config.model.num_val_timesteps
         self.cond_images = module_config.model.cond_images
 
-        self.noise_scheduler = DDPMScheduler(
-            num_train_timesteps=module_config.model.num_train_timesteps,
-            clip_sample=False,
-        )
+        if module_config.model.scheduler == 'ddpm':
+            self.noise_scheduler = DDPMScheduler(
+                num_train_timesteps=module_config.model.num_train_timesteps,
+                clip_sample=False,
+            )
+        elif module_config.model.scheduler == 'ddim':
+          self.noise_scheduler = DDIMScheduler(
+                num_train_timesteps=module_config.model.num_train_timesteps,
+                clip_sample=False,
+            )
+        else:
+            raise ValueError(f'Unrecognized schedule {module_config.model.scheduler}')
+
 
         self.optim_config = module_config.optimizer
 
-        autoencoder_checkpoint = module_config.model.autoencoder_checkpoint
-        module_config.model = module_config.model.autoencoder
-        clm = AutoencoderLM.load_from_checkpoint(
+        autoencoder_checkpoint = module_config.model.autoencoder.checkpoint
+        autoencoder_config = module_config.copy()
+        autoencoder_config.model = module_config.model.autoencoder.model
+
+        alm = AutoencoderLM.load_from_checkpoint(
             autoencoder_checkpoint,
-            module_config=module_config,
+            module_config=autoencoder_config,
         )
 
-        self.autoencoder = clm.vae
+        self.autoencoder = alm.vae
         self.autoencoder.eval()
         self.autoencoder.to(self.unet.device)
 
+        if module_config.model.cytoself is not None:
+            cytoself_checkpoint = module_config.model.cytoself.checkpoint
+            cytoself_config = module_config.copy()
+            cytoself_config.model = module_config.model.cytoself.model
+            clm = CytoselfLM.load_from_checkpoint(
+                cytoself_checkpoint,
+                module_config=cytoself_config,
+                num_class=module_config.model.cytoself.num_class
+            )
+            self.clm = clm
+        else:
+            self.clm = None
+
         self.ssim = SSIM(n_channels=1)
+        self.psnr = PSNR()
         self.results = []
 
     def forward(self, batch):
@@ -79,8 +107,7 @@ class ProteoscopeLM(LightningModule):
             seq_embeds = torch.zeros_like(seq_embeds)
 
         if self.cond_images:
-            cond_images = batch["image"][:, 1, :, :].unsqueeze(dim=1)
-            cond_images = torch.cat([torch.zeros_like(cond_images), cond_images], dim=1)
+            cond_images = batch["nuclei_distance"]
         else:
             cond_images = None
 
@@ -90,10 +117,8 @@ class ProteoscopeLM(LightningModule):
                 / self.latents_init_scale
             )
             if cond_images is not None:
-                latents_cond = (
-                    self.autoencoder.encode(cond_images).latent_dist.sample()
-                    / self.latents_init_scale
-                )
+                latents_cond = resize(cond_images, self.latents_shape[-2:]) / self.cond_latents_init_scale
+                latents_cond = latents_cond.unsqueeze(dim=1)
             else:
                 latents_cond = None
 
@@ -136,6 +161,7 @@ class ProteoscopeLM(LightningModule):
 
     def validation_step(self, batch, batch_idx, dataloader_idx=0):
         loss = self(batch)
+        
         self.log(
             "val_loss",
             loss,
@@ -146,12 +172,31 @@ class ProteoscopeLM(LightningModule):
             sync_dist=True,
         )
 
+        output_latents = self.sample(
+            batch,
+            guidance_scale=self.guidance_scale,
+            num_inference_steps=self.num_val_timesteps,
+        )
+        output_images = self.autoencoder.decode(output_latents).sample.clip(0, 1)
+
+        scores = self.score(batch["image"], output_images, batch["label"])
+
+        for key, value in scores.items():
+            self.log(
+                "val_" + key,
+                value,
+                on_step=False,
+                on_epoch=True,
+                prog_bar=False,
+                logger=True,
+                sync_dist=True,
+            )
+
         if self.global_rank == 0 and len(self.results) < 16:
             self.results.append(
                 (
-                    batch["image"][0].unsqueeze_(0),
-                    batch["sequence_embed"][0].unsqueeze_(0),
-                    batch["sequence_mask"][0].unsqueeze_(0),
+                    batch["image"],
+                    output_images,
                 )
             )
 
@@ -162,49 +207,14 @@ class ProteoscopeLM(LightningModule):
         if len(self.results) == 0:
             return
 
-        images = torch.cat([r[0] for r in self.results[:16]])
-        seq_emb = torch.cat([r[1] for r in self.results[:16]])
-        seq_mask = torch.cat([r[2] for r in self.results[:16]])
+        input_images = torch.cat([r[0] for r in self.results[:16]])
+        output_images = torch.cat([r[1] for r in self.results[:16]])
         self.results = []
 
-        batch = {}
-        batch["image"] = images
-        batch["sequence_embed"] = seq_emb
-        batch["sequence_mask"] = seq_mask
-
-        num_inference_steps = self.noise_scheduler.config.num_train_timesteps // 5
-        output_latents = self.sample(
-            batch,
-            guidance_scale=self.guidance_scale,
-            num_inference_steps=num_inference_steps,
-        )
-        output_images = self.autoencoder.decode(output_latents).sample.clip(0, 1)
-
-        pro = combine_images(images[:, 0], output_images[:, 0])
-        nuc = combine_images(images[:, 1], output_images[:, 1])
-
-        ssim_score = {}
-        ssim_score["ssim_pro"] = self.ssim(
-            images[:, 0].unsqueeze_(1),
-            torch.clip(output_images[:, 0].unsqueeze_(1), 0, 1),
-        )
-        ssim_score["ssim_nuc"] = self.ssim(
-            images[:, 1].unsqueeze_(1),
-            torch.clip(output_images[:, 1].unsqueeze_(1), 0, 1),
-        )
+        pro = combine_images(input_images[:, 0], output_images[:, 0])
+        nuc = combine_images(input_images[:, 1], output_images[:, 1])
 
         if self.global_step > 0:
-            for key, value in ssim_score.items():
-                self.log(
-                    "val_" + key,
-                    value,
-                    on_step=False,
-                    on_epoch=True,
-                    prog_bar=True,
-                    logger=True,
-                    sync_dist=False,
-                )
-
             tensorboard_logger = self.logger.experiment
             tensorboard_logger.add_image(
                 "pro",
@@ -233,11 +243,10 @@ class ProteoscopeLM(LightningModule):
         seq_mask = batch["sequence_mask"].to(self.unet.device)
 
         if cond_images is None and self.cond_images:
-            cond_images = batch["image"][:, 1, :, :].unsqueeze(dim=1)
+            cond_images = batch["nuclei_distance"]
 
         if cond_images is not None:
             cond_images.to(self.unet.device)
-            cond_images = torch.cat([torch.zeros_like(cond_images), cond_images], dim=1)
 
         bs = batch["image"].shape[0]
         latents_shape = (bs,) + self.latents_shape
@@ -247,10 +256,8 @@ class ProteoscopeLM(LightningModule):
 
         if cond_images is not None:
             with torch.no_grad():
-                latents_cond = (
-                    self.autoencoder.encode(cond_images).latent_dist.mode()
-                    / self.latents_init_scale
-                )
+                latents_cond = resize(cond_images, self.latents_shape[-2:]) / self.cond_latents_init_scale
+                latents_cond = latents_cond.unsqueeze(dim=1)
                 latents_cond = torch.cat([latents_cond] * 2)
         else:
             latents_cond = None
@@ -294,6 +301,29 @@ class ProteoscopeLM(LightningModule):
             latents = self.noise_scheduler.step(noise_pred, t, latents).prev_sample
 
         return latents * self.latents_init_scale
+
+    @torch.no_grad()
+    def score(self, input_image, output_image, labels):
+
+        scores = {}
+
+        if self.clm is not None:
+            input_cytoself_embed = self.clm.model(input_image, 'vqvec2')
+            _, input_cytoself_logits = self.clm.model(input_image)
+
+            output_cytoself_embed = self.clm.model(output_image, 'vqvec2') # make 'vqvec2' param ....
+            _, output_cytoself_logits = self.clm.model(output_image)
+
+        scores['cytoself_distance'] = F.mse_loss(input_cytoself_embed, output_cytoself_embed)
+        scores['cytoself_input_classifcation'] = F.cross_entropy(input_cytoself_logits, labels)
+        scores['cytoself_output_classifcation'] = F.cross_entropy(output_cytoself_logits, labels)
+
+        scores['ssim_pro'] = self.ssim(input_image[:, 0].unsqueeze_(1), output_image[:, 0].unsqueeze_(1))
+        scores['ssim_nuc'] = self.ssim(input_image[:, 1].unsqueeze_(1), output_image[:, 1].unsqueeze_(1))
+
+        scores['psnr_pro'] = self.psnr(input_image[:, 0].unsqueeze_(1), output_image[:, 0].unsqueeze_(1))
+        scores['psnr_nuc'] = self.psnr(input_image[:, 1].unsqueeze_(1), output_image[:, 1].unsqueeze_(1))
+        return scores
 
     def configure_optimizers(self):
         params = self.unet.parameters()

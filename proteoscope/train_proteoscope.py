@@ -53,7 +53,7 @@ def train_proteoscope(config: ProteoscopeConfig) -> None:
         callbacks=[checkpoint_callback, lr_monitor_callback],
         accumulate_grad_batches=config.trainer.accumulate,
         gradient_clip_val=config.trainer.gradient_clip_val,
-        deterministic=True,
+        deterministic=False,
     )
     trainer.fit(
         clm,

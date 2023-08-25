@@ -1,5 +1,5 @@
 sample_size: 25
-in_channels: 8
+in_channels: 5
 out_channels: 4
 layers_per_block: 2
 block_out_channels: [128, 256, 512]
@@ -8,23 +8,45 @@ down_block_types: ['CrossAttnDownBlock2D', 'CrossAttnDownBlock2D', 'DownBlock2D'
 up_block_types: ['UpBlock2D', 'CrossAttnUpBlock2D', 'CrossAttnUpBlock2D']
 cross_attention_dim: 1280
 num_train_timesteps: 1000
+num_val_timesteps: 200
 cond_images: True
-unconditioned_probability: 0.2
+unconditioned_probability: 0.5
 latents_init_scale: 2.895
+cond_latents_init_scale: 11.29
 guidance_scale: 3.0
-autoencoder_checkpoint: /home/ec2-user/outputs/autoencoder/2023-08-19/17-28-45/checkpoints/last.ckpt # 2023-08-17/05-03-37
+scheduler: ddim
 autoencoder:
-  in_channels: 2
-  out_channels: 2
-  layers_per_block: 2
-  block_out_channels: [128, 256, 512]
-  latent_channels: 4
-  down_block_types: ['DownEncoderBlock2D', 'DownEncoderBlock2D', 'DownEncoderBlock2D']
-  up_block_types: ['UpDecoderBlock2D', 'UpDecoderBlock2D', 'UpDecoderBlock2D']
-  loss:
-    classifier_weight: 0.1
-    kl_weight: 1e-7
-    perceptual_weight: 2.0
-    pixel_weight: 1.0
-    disc_weight: 1.0
-    disc_start: 2400
+  checkpoint: /home/ec2-user/outputs/autoencoder/2023-08-19/17-28-45/checkpoints/last.ckpt # 2023-08-17/05-03-37
+  model:
+    in_channels: 2
+    out_channels: 2
+    layers_per_block: 2
+    block_out_channels: [128, 256, 512]
+    latent_channels: 4
+    down_block_types: ['DownEncoderBlock2D', 'DownEncoderBlock2D', 'DownEncoderBlock2D']
+    up_block_types: ['UpDecoderBlock2D', 'UpDecoderBlock2D', 'UpDecoderBlock2D']
+    loss:
+      classifier_weight: 0.1
+      kl_weight: 1e-7
+      perceptual_weight: 2.0
+      pixel_weight: 1.0
+      disc_weight: 1.0
+      disc_start: 2400
+cytoself:
+  checkpoint: /home/ec2-user/outputs/cytoself/2023-08-21/19-45-50/checkpoints/last.ckpt # 2023-08-17/05-03-37
+  num_class: 1311 # 1311 or 1049
+  model:
+    input_shape: [2, 100, 100]
+    emb_shapes: [[25, 25], [4, 4]]
+    output_shape: [2, 100, 100]
+    fc_output_idx: [2]
+    vq_args:
+      num_embeddings: 2048
+      embedding_dim: 64
+    fc_args:
+      num_layers: 2
+    fc_input_type: 'vqvec'
+    num_class: null
+    vq_coeff: 1.0
+    fc_coeff: 1.0
+    image_variance: 0.0167
