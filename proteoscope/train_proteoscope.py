@@ -59,5 +59,5 @@ def train_proteoscope(config: ProteoscopeConfig) -> None:
         clm,
         ckpt_path=config.chkpt,
         train_dataloaders=pdm.train_dataloader(),
-        val_dataloaders=pdm.val_dataloader(),
+        val_dataloaders=[pdm.val_dataloader(), pdm.train_dataloader()],
     )

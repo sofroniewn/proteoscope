@@ -64,10 +64,22 @@ class ProteoscopeDM(LightningDataModule):
             split_images=self.splits.val_images,
             transform=None,
             trim=self.trim,
-            shuffle=True,
+            shuffle=42, # Seed value for shuffle
             sequence_embedding=self.sequence_embedding,
         )
 
+        self.val_train_dataset = ProteoscopeDataset(
+            images=self.images,
+            labels=self.labels,
+            sequences=self.sequences,
+            split_protein=self.splits.train_protein,
+            split_images=self.splits.train_images,
+            transform=None,
+            trim=self.trim,
+            shuffle=True,
+            sequence_embedding=self.sequence_embedding,
+        )
+        
         self.predict_dataset = ProteoscopeDataset(
             images=self.images,
             labels=self.labels,
@@ -93,6 +105,15 @@ class ProteoscopeDM(LightningDataModule):
     def val_dataloader(self):
         return DataLoader(
             self.val_dataset,
+            batch_size=self.batch_size,
+            shuffle=False,
+            num_workers=self.num_workers,
+            pin_memory=True,
+        )
+
+    def val_train_dataloader(self):
+        return DataLoader(
+            self.val_train_dataset,
             batch_size=self.batch_size,
             shuffle=False,
             num_workers=self.num_workers,

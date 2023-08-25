@@ -85,9 +85,11 @@ class ProteoscopeLM(LightningModule):
                 module_config=cytoself_config,
                 num_class=module_config.model.cytoself.num_class
             )
-            self.clm = clm
+            self.cytoself = clm.model
+            self.cytoself.eval()
+            self.cytoself.to(self.unet.device)
         else:
-            self.clm = None
+            self.cytoself = None
 
         self.ssim = SSIM(n_channels=1)
         self.psnr = PSNR()
@@ -162,14 +164,20 @@ class ProteoscopeLM(LightningModule):
     def validation_step(self, batch, batch_idx, dataloader_idx=0):
         loss = self(batch)
         
+        if dataloader_idx == 1:
+            extra = 'train_'
+        else:
+            extra = ''
+
         self.log(
-            "val_loss",
+            f"val_{extra}loss",
             loss,
             on_step=False,
             on_epoch=True,
             prog_bar=True,
             logger=True,
             sync_dist=True,
+            add_dataloader_idx=False,
         )
 
         output_latents = self.sample(
@@ -183,16 +191,17 @@ class ProteoscopeLM(LightningModule):
 
         for key, value in scores.items():
             self.log(
-                "val_" + key,
+                "val_" + extra + key,
                 value,
                 on_step=False,
                 on_epoch=True,
                 prog_bar=False,
                 logger=True,
                 sync_dist=True,
+                add_dataloader_idx=False,
             )
 
-        if self.global_rank == 0 and len(self.results) < 16:
+        if self.global_rank == 0 and len(self.results) < 16 and dataloader_idx == 0:
             self.results.append(
                 (
                     batch["image"],
@@ -258,7 +267,7 @@ class ProteoscopeLM(LightningModule):
             with torch.no_grad():
                 latents_cond = resize(cond_images, self.latents_shape[-2:]) / self.cond_latents_init_scale
                 latents_cond = latents_cond.unsqueeze(dim=1)
-                latents_cond = torch.cat([latents_cond] * 2)
+                latents_cond = torch.cat([latents_cond] * 2).to(self.unet.device)
         else:
             latents_cond = None
 
@@ -307,12 +316,12 @@ class ProteoscopeLM(LightningModule):
 
         scores = {}
 
-        if self.clm is not None:
-            input_cytoself_embed = self.clm.model(input_image, 'vqvec2')
-            _, input_cytoself_logits = self.clm.model(input_image)
+        if self.cytoself is not None:
+            input_cytoself_embed = self.cytoself(input_image, 'vqvec2')
+            _, input_cytoself_logits = self.cytoself(input_image)
 
-            output_cytoself_embed = self.clm.model(output_image, 'vqvec2') # make 'vqvec2' param ....
-            _, output_cytoself_logits = self.clm.model(output_image)
+            output_cytoself_embed = self.cytoself(output_image, 'vqvec2') # make 'vqvec2' param ....
+            _, output_cytoself_logits = self.cytoself(output_image)
 
         scores['cytoself_distance'] = F.mse_loss(input_cytoself_embed, output_cytoself_embed)
         scores['cytoself_input_classifcation'] = F.cross_entropy(input_cytoself_logits, labels)

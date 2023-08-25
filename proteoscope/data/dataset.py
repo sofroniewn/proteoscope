@@ -18,7 +18,7 @@ class ProteoscopeDataset(Dataset):
         sequences=None,
         unique_protein=False,
         sequence_embedding=None,
-        shuffle=False,
+        shuffle=None,
         transform: Optional[Sequence] = (
             transforms.RandomApply(
                 [
@@ -62,8 +62,8 @@ class ProteoscopeDataset(Dataset):
 
         self.sequences = sequences
         self.sequence_embedding = sequence_embedding
-        if shuffle:
-            self.shuffle = np.random.permutation(len(self.labels))
+        if shuffle is not None:
+            self.shuffle = np.random.RandomState(seed=shuffle).permutation(len(self.labels))
         else:
             self.shuffle = None
 
