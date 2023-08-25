@@ -47,6 +47,9 @@ class ProteoscopeLM(LightningModule):
         self.num_val_timesteps = module_config.model.num_val_timesteps
         self.cond_images = module_config.model.cond_images
 
+        layer_norm_shape = (module_config.model.sequence_length, module_config.model.cross_attention_dim)
+        self.layer_norm = torch.nn.LayerNorm(layer_norm_shape)
+
         if module_config.model.scheduler == 'ddpm':
             self.noise_scheduler = DDPMScheduler(
                 num_train_timesteps=module_config.model.num_train_timesteps,
@@ -97,6 +100,7 @@ class ProteoscopeLM(LightningModule):
 
     def forward(self, batch):
         seq_embeds = batch["sequence_embed"]
+        seq_embeds = self.layer_norm(seq_embeds)
         seq_mask = batch["sequence_mask"]
 
         if self.latents_init_scale is None:
@@ -165,12 +169,12 @@ class ProteoscopeLM(LightningModule):
         loss = self(batch)
         
         if dataloader_idx == 1:
-            extra = 'train_'
+            extra = '_train'
         else:
             extra = ''
 
         self.log(
-            f"val_{extra}loss",
+            f"val{extra}_loss",
             loss,
             on_step=False,
             on_epoch=True,
@@ -191,7 +195,7 @@ class ProteoscopeLM(LightningModule):
 
         for key, value in scores.items():
             self.log(
-                "val_" + extra + key,
+                key + "val" + extra,
                 value,
                 on_step=False,
                 on_epoch=True,
@@ -226,14 +230,14 @@ class ProteoscopeLM(LightningModule):
         if self.global_step > 0:
             tensorboard_logger = self.logger.experiment
             tensorboard_logger.add_image(
-                "pro",
+                "img_pro",
                 pro,
                 self.global_step,
                 dataformats="HW",
             )
 
             tensorboard_logger.add_image(
-                "nuc",
+                "img_nuc",
                 nuc,
                 self.global_step,
                 dataformats="HW",
@@ -249,6 +253,7 @@ class ProteoscopeLM(LightningModule):
             generator = None
 
         seq_embeds = batch["sequence_embed"].to(self.unet.device)
+        seq_embeds = self.layer_norm(seq_embeds)
         seq_mask = batch["sequence_mask"].to(self.unet.device)
 
         if cond_images is None and self.cond_images:
@@ -335,7 +340,7 @@ class ProteoscopeLM(LightningModule):
         return scores
 
     def configure_optimizers(self):
-        params = self.unet.parameters()
+        params = self.unet.parameters() + self.layer_norm.parameters()
 
         optimizer = optim.AdamW(
             params,

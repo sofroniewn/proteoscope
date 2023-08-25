@@ -27,6 +27,7 @@ class CytoselfLM(LightningModule):
         del model_args["image_variance"]
 
         self.model = CytoselfFull(**model_args)
+        self.model.num_class = num_class
 
         self.optim_config = module_config.optimizer
 

@@ -7,10 +7,11 @@ latent_channels: 4
 down_block_types: ['CrossAttnDownBlock2D', 'CrossAttnDownBlock2D', 'DownBlock2D']
 up_block_types: ['UpBlock2D', 'CrossAttnUpBlock2D', 'CrossAttnUpBlock2D']
 cross_attention_dim: 1280
+sequence_length: 1024 # 1024 or 1
 num_train_timesteps: 1000
 num_val_timesteps: 200
 cond_images: True
-unconditioned_probability: 0.5
+unconditioned_probability: 0.6
 latents_init_scale: 2.895
 cond_latents_init_scale: 11.29
 guidance_scale: 3.0
