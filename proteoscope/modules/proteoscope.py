@@ -103,12 +103,6 @@ class ProteoscopeLM(LightningModule):
         seq_embeds = self.layer_norm(seq_embeds)
         seq_mask = batch["sequence_mask"]
 
-        if self.latents_init_scale is None:
-            with torch.no_grad():
-                first_batch_latents = self.autoencoder.encode(batch["image"]).latent_dist.mode()
-                latent_init_mean = first_batch_latents.mean()
-                self.latents_init_scale = (first_batch_latents - latent_init_mean).pow(2).mean().pow(0.5)
-
         if torch.rand(1) < self.unconditioned_probability:
             seq_embeds = torch.zeros_like(seq_embeds)
 
@@ -117,11 +111,18 @@ class ProteoscopeLM(LightningModule):
         else:
             cond_images = None
 
+        # Create latents
         with torch.no_grad():
+            if self.latents_init_scale is None:
+                first_batch_latents = self.autoencoder.encode(batch["image"]).latent_dist.mode()
+                latent_init_mean = first_batch_latents.mean()
+                self.latents_init_scale = (first_batch_latents - latent_init_mean).pow(2).mean().pow(0.5)
+
             latents = (
                 self.autoencoder.encode(batch["image"]).latent_dist.sample()
                 / self.latents_init_scale
             )
+
             if cond_images is not None:
                 latents_cond = resize(cond_images, self.latents_shape[-2:]) / self.cond_latents_init_scale
                 latents_cond = latents_cond.unsqueeze(dim=1)
@@ -195,7 +196,7 @@ class ProteoscopeLM(LightningModule):
 
         for key, value in scores.items():
             self.log(
-                key + "val" + extra,
+                key + "_val" + extra,
                 value,
                 on_step=False,
                 on_epoch=True,
@@ -243,6 +244,7 @@ class ProteoscopeLM(LightningModule):
                 dataformats="HW",
             )
 
+    @torch.no_grad()
     def sample(
         self, batch, guidance_scale=1.0, cond_images=None, num_inference_steps=None, seed=None,
     ):
@@ -269,10 +271,9 @@ class ProteoscopeLM(LightningModule):
         latents = torch.randn(latents_shape, generator=generator, device=self.unet.device)
 
         if cond_images is not None:
-            with torch.no_grad():
-                latents_cond = resize(cond_images, self.latents_shape[-2:]) / self.cond_latents_init_scale
-                latents_cond = latents_cond.unsqueeze(dim=1)
-                latents_cond = torch.cat([latents_cond] * 2).to(self.unet.device)
+            latents_cond = resize(cond_images, self.latents_shape[-2:]) / self.cond_latents_init_scale
+            latents_cond = latents_cond.unsqueeze(dim=1)
+            latents_cond = torch.cat([latents_cond] * 2).to(self.unet.device)
         else:
             latents_cond = None
 
@@ -297,13 +298,12 @@ class ProteoscopeLM(LightningModule):
                 )
 
             # predict the noise residual
-            with torch.no_grad():
-                noise_pred = self.unet(
-                    latent_model_input,
-                    t,
-                    encoder_hidden_states=seq_embeds,
-                    encoder_attention_mask=seq_mask,
-                ).sample
+            noise_pred = self.unet(
+                latent_model_input,
+                t,
+                encoder_hidden_states=seq_embeds,
+                encoder_attention_mask=seq_mask,
+            ).sample
 
             # perform guidance
             noise_pred_uncond, noise_pred_text = noise_pred.chunk(2)
@@ -340,7 +340,7 @@ class ProteoscopeLM(LightningModule):
         return scores
 
     def configure_optimizers(self):
-        params = self.unet.parameters() + self.layer_norm.parameters()
+        params = list(self.unet.parameters()) + list(self.layer_norm.parameters())
 
         optimizer = optim.AdamW(
             params,
