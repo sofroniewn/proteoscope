@@ -11,6 +11,7 @@ from ema_pytorch import EMA
 
 from .autoencoder import AutoencoderLM
 from .cytoself import CytoselfLM
+from .esm_bottleneck import ESMBottleneck
 
 
 def combine_images(img_set1, img_set2):
@@ -53,11 +54,7 @@ class ProteoscopeLM(LightningModule):
         self.num_val_timesteps = module_config.model.num_val_timesteps
         self.cond_images = module_config.model.cond_images
 
-        layer_norm_shape = (
-            module_config.model.sequence_length,
-            module_config.model.cross_attention_dim,
-        )
-        self.layer_norm = torch.nn.LayerNorm(layer_norm_shape)
+        self.esm_bottleneck = ESMBottleneck(module_config.model.esm_bottleneck)
 
         if module_config.model.scheduler == "ddpm":
             self.noise_scheduler = DDPMScheduler(
@@ -107,9 +104,10 @@ class ProteoscopeLM(LightningModule):
         self.results = []
 
     def forward(self, batch):
-        seq_embeds = batch["sequence_embed"]
-        seq_embeds = self.layer_norm(seq_embeds)
-        seq_mask = batch["sequence_mask"]
+        seq_embeds = self.esm_bottleneck(
+            batch["sequence_embed"], batch["sequence_mask"]
+        )
+        seq_mask = torch.ones((seq_embeds.shape[0], 1), dtype=bool)
 
         if torch.rand(1) < self.unconditioned_probability:
             seq_embeds = torch.zeros_like(seq_embeds)
@@ -273,9 +271,12 @@ class ProteoscopeLM(LightningModule):
         else:
             generator = None
 
-        seq_embeds = batch["sequence_embed"].to(self.unet.device)
-        seq_embeds = self.layer_norm(seq_embeds)
-        seq_mask = batch["sequence_mask"].to(self.unet.device)
+        seq_embeds = self.esm_bottleneck(
+            batch["sequence_embed"], batch["sequence_mask"]
+        )
+        seq_mask = torch.ones(
+            (seq_embeds.shape[0], 1), dtype=bool, device=self.unet.device
+        )
 
         if cond_images is None and self.cond_images:
             cond_images = batch["nuclei_distance"]
@@ -379,7 +380,7 @@ class ProteoscopeLM(LightningModule):
         return scores
 
     def configure_optimizers(self):
-        params = list(self.unet.parameters()) + list(self.layer_norm.parameters())
+        params = list(self.unet.parameters()) + list(self.esm_bottleneck.parameters())
 
         optimizer = optim.AdamW(
             params,
