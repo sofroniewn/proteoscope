@@ -9,3 +9,4 @@ batch_size: 16 # for effective batch size multiply batch_size * num_devices * ac
 num_workers: 12
 accumulate: 1
 max_steps: 120_000
+ema_decay: 0.9999

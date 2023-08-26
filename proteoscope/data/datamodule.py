@@ -64,7 +64,7 @@ class ProteoscopeDM(LightningDataModule):
             split_images=self.splits.val_images,
             transform=None,
             trim=self.trim,
-            shuffle=42, # Seed value for shuffle
+            shuffle=42,  # Seed value for shuffle
             sequence_embedding=self.sequence_embedding,
         )
 
@@ -79,7 +79,7 @@ class ProteoscopeDM(LightningDataModule):
             shuffle=True,
             sequence_embedding=self.sequence_embedding,
         )
-        
+
         self.predict_dataset = ProteoscopeDataset(
             images=self.images,
             labels=self.labels,
@@ -129,7 +129,14 @@ class ProteoscopeDM(LightningDataModule):
             pin_memory=True,
         )
 
-    def custom_dataloader(self, split_protein=None, split_images=None, unique_protein=False, shuffle=False, batch_size=None):
+    def custom_dataloader(
+        self,
+        split_protein=None,
+        split_images=None,
+        unique_protein=False,
+        shuffle=False,
+        batch_size=None,
+    ):
         dataset = ProteoscopeDataset(
             images=self.images,
             labels=self.labels,
@@ -143,7 +150,7 @@ class ProteoscopeDM(LightningDataModule):
         )
         if batch_size is None:
             batch_size = self.batch_size
-        
+
         return DataLoader(
             dataset,
             batch_size=batch_size,
@@ -151,7 +158,6 @@ class ProteoscopeDM(LightningDataModule):
             num_workers=self.num_workers,
             pin_memory=True,
         )
-
 
     def teardown(self, stage=None):
         pass

@@ -63,7 +63,9 @@ class ProteoscopeDataset(Dataset):
         self.sequences = sequences
         self.sequence_embedding = sequence_embedding
         if shuffle is not None:
-            self.shuffle = np.random.RandomState(seed=shuffle).permutation(len(self.labels))
+            self.shuffle = np.random.RandomState(seed=shuffle).permutation(
+                len(self.labels)
+            )
         else:
             self.shuffle = None
 
@@ -103,7 +105,9 @@ class ProteoscopeDataset(Dataset):
 
         if self.sequences is not None and self.sequence_embedding is not None:
             if self.sequence_embedding == "ESM-mean":
-                item["sequence_embed"] = self.sequences[item["seq_embedding_index"], 1 : 1 + row["truncation"]].mean(axis=0)[None, ...]
+                item["sequence_embed"] = self.sequences[
+                    item["seq_embedding_index"], 1 : 1 + row["truncation"]
+                ].mean(axis=0)[None, ...]
                 item["sequence_mask"] = torch.ones(1, dtype=torch.bool)
             elif self.sequence_embedding == "one-hot":
                 item["sequence_embed"] = torch.zeros((1, 1280))
@@ -113,10 +117,14 @@ class ProteoscopeDataset(Dataset):
                 item["sequence_embed"] = torch.randn((1, 1280))
                 item["sequence_mask"] = torch.ones(1, dtype=torch.bool)
             elif self.sequence_embedding == "ESM-full":
-                item["sequence_embed"] = self.sequences[item["seq_embedding_index"], 1 :]
-                item["sequence_mask"] = torch.zeros(len(item["sequence_embed"]), dtype=torch.bool)
+                item["sequence_embed"] = self.sequences[item["seq_embedding_index"], 1:]
+                item["sequence_mask"] = torch.zeros(
+                    len(item["sequence_embed"]), dtype=torch.bool
+                )
                 item["sequence_mask"][: row["truncation"]] = True
             elif self.sequence_embedding == "ESM-bos":
-                item["sequence_embed"] = self.sequences[item["seq_embedding_index"], 0][None, ...]
+                item["sequence_embed"] = self.sequences[item["seq_embedding_index"], 0][
+                    None, ...
+                ]
                 item["sequence_mask"] = torch.ones(1, dtype=torch.bool)
         return item

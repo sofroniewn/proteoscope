@@ -6,6 +6,7 @@ from torch.optim.lr_scheduler import CosineAnnealingLR
 from omegaconf import OmegaConf
 from piqa import SSIM
 from pytorch_lightning import LightningModule
+
 # from torchvision.ops import MLP
 # from torchmetrics.image.lpip import LearnedPerceptualImagePatchSimilarity
 from ..losses import LPIPSWithDiscriminator
@@ -41,10 +42,10 @@ class AutoencoderLM(LightningModule):
             pixelloss_weight=module_config.model.loss.pixel_weight,
             perceptual_weight=module_config.model.loss.perceptual_weight,
             disc_weight=module_config.model.loss.disc_weight,
-            disc_in_channels=module_config.model.out_channels
+            disc_in_channels=module_config.model.out_channels,
         )
         self.automatic_optimization = False
-        
+
         # height = module_config.image_height / (
         #     2 ** (len(module_config.model.block_out_channels) - 1)
         # )
@@ -86,7 +87,7 @@ class AutoencoderLM(LightningModule):
         else:
             return reconstructed, posterior
 
-    def training_step(self, batch, batch_idx):        
+    def training_step(self, batch, batch_idx):
         optimizer_ae, optimizer_disc = self.optimizers()
         scheduler_ae, scheduler_disc = self.lr_schedulers()
 
@@ -143,7 +144,7 @@ class AutoencoderLM(LightningModule):
         self.log_dict(
             log_dict_disc, prog_bar=False, logger=True, on_step=True, on_epoch=False
         )
-        
+
         optimizer_disc.zero_grad()
         self.manual_backward(discloss)
         optimizer_disc.step()
@@ -222,7 +223,9 @@ class AutoencoderLM(LightningModule):
             )
 
         if self.global_rank == 0 and len(self.results) < 16:
-            self.results.append((inputs[0].unsqueeze_(0), reconstructions[0].unsqueeze_(0)))
+            self.results.append(
+                (inputs[0].unsqueeze_(0), reconstructions[0].unsqueeze_(0))
+            )
         return self.log_dict
 
     def on_validation_epoch_end(self):

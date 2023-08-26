@@ -15,6 +15,8 @@ unconditioned_probability: 0.6
 latents_init_scale: 2.895
 cond_latents_init_scale: 11.29
 guidance_scale: 3.0
+ema_decay: 0.9999
+ema_update_after_step: 10_000
 scheduler: ddim
 autoencoder:
   checkpoint: /home/ec2-user/outputs/autoencoder/2023-08-19/17-28-45/checkpoints/last.ckpt # 2023-08-17/05-03-37

@@ -22,7 +22,6 @@ def merge_prot_nuc(image, percentiles=None):
 
 
 def browse_reconstructions(A, B, names=None, n_im=16):
-
     if names is not None:
         unique_names = np.unique(names)
     else:
@@ -40,10 +39,10 @@ def browse_reconstructions(A, B, names=None, n_im=16):
         n = min(n_im, A_.shape[0])
         use = np.random.choice(A_.shape[0], size=n, replace=False)
         isns.ImageGrid(
-            A_[use], col_wrap=n_im//2, cbar=False, height=1.5, axis=0, cmap="viridis"
+            A_[use], col_wrap=n_im // 2, cbar=False, height=1.5, axis=0, cmap="viridis"
         )
         isns.ImageGrid(
-            B_[use], col_wrap=n_im//2, cbar=False, height=1.5, axis=0, cmap="viridis"
+            B_[use], col_wrap=n_im // 2, cbar=False, height=1.5, axis=0, cmap="viridis"
         )
 
     if unique_names is not None:

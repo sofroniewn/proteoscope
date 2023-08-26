@@ -18,18 +18,16 @@ def train_cytoself(config: ProteoscopeConfig) -> None:
         splits=config.splits,
     )
     pdm.setup()
-    
+
     if config.model_type == "cytoself":
-        clm = CytoselfLM(module_config=config.module, num_class = pdm.num_class)
+        clm = CytoselfLM(module_config=config.module, num_class=pdm.num_class)
     elif config.model_type == "autoencoder":
         clm = AutoencoderLM(module_config=config.module)
     else:
         raise ValueError(f"Unrecognized model type {config.model_type}")
 
     print(clm)
-    print(
-        f"Train samples {len(pdm.train_dataset)}, Val samples {len(pdm.val_dataset)}"
-    )
+    print(f"Train samples {len(pdm.train_dataset)}, Val samples {len(pdm.val_dataset)}")
 
     checkpoint_callback = ModelCheckpoint(
         save_top_k=2, monitor="val_loss", mode="min", save_last=True

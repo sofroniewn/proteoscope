@@ -25,9 +25,7 @@ def train_proteoscope(config: ProteoscopeConfig) -> None:
         module_config=config.module,
     )
     print(clm)
-    print(
-        f"Train samples {len(pdm.train_dataset)}, Val samples {len(pdm.val_dataset)}"
-    )
+    print(f"Train samples {len(pdm.train_dataset)}, Val samples {len(pdm.val_dataset)}")
 
     checkpoint_callback = ModelCheckpoint(
         save_top_k=2, monitor="val_loss", mode="min", save_last=True
