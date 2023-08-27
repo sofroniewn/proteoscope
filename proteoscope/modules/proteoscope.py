@@ -104,16 +104,13 @@ class ProteoscopeLM(LightningModule):
         self.results = []
 
     def forward(self, batch):
+        seq_embeds = self.esm_bottleneck(
+            batch["sequence_embed"], batch["sequence_mask"]
+        )
+
         if torch.rand(1) < self.unconditioned_probability:
-            seq_embeds = torch.ones(
-                (batch["sequence_embed"].shape[0], 1),
-                dtype=float,
-                device=batch["sequence_embed"].device,
-            )
-        else:
-            seq_embeds = self.esm_bottleneck(
-                batch["sequence_embed"], batch["sequence_mask"]
-            )
+            seq_embeds = torch.ones_like(seq_embeds)
+
         seq_mask = torch.ones(
             (seq_embeds.shape[0], 1), dtype=bool, device=seq_embeds.device
         )
