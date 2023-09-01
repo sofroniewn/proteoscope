@@ -1,8 +1,8 @@
-learning_rate: 2e-4 # 0.001
+learning_rate: 4e-4 # 0.001
 learning_rate_min_factor: 0.1
 beta_1: 0.9
 beta_2: 0.98
 eps: 0.00000001 # 1e-8
 weight_decay: 0.01
 warmup: 200 # in steps, 2869 steps / epoch if batch size 4 * 4 * 64
-max_iters: 28_690 # steps for 10 epochs
+max_iters: 57_380 # steps for 10 epochs - always do 2 x expectected for cosine

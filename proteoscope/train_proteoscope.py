@@ -18,6 +18,7 @@ def train_proteoscope(config: ProteoscopeConfig) -> None:
         num_workers=config.trainer.num_workers,
         sequence_embedding=config.data.sequence_embedding,
         splits=config.splits,
+        sequence_dropout=config.data.sequence_dropout
     )
     pdm.setup()
 

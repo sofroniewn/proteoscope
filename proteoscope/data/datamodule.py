@@ -21,6 +21,7 @@ class ProteoscopeDM(LightningDataModule):
         sequences_path: Optional[str] = None,
         trim: Optional[int] = None,
         sequence_embedding: Optional[str] = None,
+        sequence_dropout: Optional[float] = None,
     ):
         super().__init__()
 
@@ -32,6 +33,7 @@ class ProteoscopeDM(LightningDataModule):
         self.trim = trim
         self.sequence_embedding = sequence_embedding
         self.splits = splits
+        self.sequence_dropout = sequence_dropout
 
     def prepare_data(self):
         pass
@@ -54,6 +56,7 @@ class ProteoscopeDM(LightningDataModule):
             split_images=self.splits.train_images,
             trim=self.trim,
             sequence_embedding=self.sequence_embedding,
+            sequence_dropout=self.sequence_dropout,
         )
 
         self.val_dataset = ProteoscopeDataset(

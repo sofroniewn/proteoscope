@@ -19,6 +19,7 @@ class ProteoscopeDataset(Dataset):
         unique_protein=False,
         sequence_embedding=None,
         shuffle=None,
+        sequence_dropout=None,
         transform: Optional[Sequence] = (
             transforms.RandomApply(
                 [
@@ -62,6 +63,7 @@ class ProteoscopeDataset(Dataset):
 
         self.sequences = sequences
         self.sequence_embedding = sequence_embedding
+        self.sequence_dropout = sequence_dropout
         if shuffle is not None:
             self.shuffle = np.random.RandomState(seed=shuffle).permutation(
                 len(self.labels)
@@ -122,6 +124,13 @@ class ProteoscopeDataset(Dataset):
                     len(item["sequence_embed"]), dtype=torch.bool
                 )
                 item["sequence_mask"][: row["truncation"]] = True
+
+                if self.sequence_dropout is not None:
+                    dropout = torch.rand(1) * self.sequence_dropout
+                    num_to_flip = int(dropout * row["truncation"])
+                    random_indices = torch.randperm(row["truncation"])[:num_to_flip]
+                    item["sequence_mask"][random_indices] = False
+
             elif self.sequence_embedding == "ESM-bos":
                 item["sequence_embed"] = self.sequences[item["seq_embedding_index"], 0][
                     None, ...
