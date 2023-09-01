@@ -33,21 +33,10 @@ class ESMBottleneck(nn.Module):
             self.encoder = None
 
         self.return_type = config.return_type
-        self.unconditioned_type = config.unconditioned_type
 
-    def forward(self, seqs, mask, unconditioned=False):
-        if unconditioned and self.unconditioned_type == 'token':
-            guidance_token = self.guidance_embedding(
-                torch.zeros((seqs.shape[0], 1), dtype=int, device=seqs.device)
-            )
-            mask = torch.ones((mask.shape[0], 1), dtype=bool, device=mask.device)
-            return guidance_token, mask
-        elif unconditioned and self.unconditioned_type == 'zeros':
-            seqs = torch.zeros((seqs.shape[0], 1), dtype=float, device=seqs.device)
-            mask = torch.ones((mask.shape[0], 1), dtype=bool, device=mask.device)
-            return seqs, mask
-        elif unconditioned:
-            raise ValueError(f'Unrecognized unconditioned type {self.unconditioned_type}')
+    def forward(self, seqs, mask, unconditioned=None):
+        batch_size = seqs.shape[0]
+        device = seqs.device
 
         if self.projection is not None:
             # project
@@ -56,10 +45,10 @@ class ESMBottleneck(nn.Module):
         if self.return_type == 'token':
             # add guidance token
             guidance_token = self.guidance_embedding(
-                torch.zeros((seqs.shape[0], 1), dtype=int, device=seqs.device)
+                torch.zeros((batch_size, 1), dtype=int, device=device)
             )
             seqs = torch.cat([guidance_token, seqs], dim=1)
-            guidance_mask = torch.ones((mask.shape[0], 1), dtype=bool, device=mask.device)
+            guidance_mask = torch.ones((batch_size, 1), dtype=bool, device=device)
             mask = torch.cat([guidance_mask, mask], dim=1)
 
         if self.encoder is not None:
@@ -68,14 +57,21 @@ class ESMBottleneck(nn.Module):
 
         if self.return_type == 'token':
             # Take just guidence token
-            mask = torch.ones((mask.shape[0], 1), dtype=bool, device=mask.device)
-            return seqs[:, 0].unsqueeze(dim=1), mask
+            mask = torch.ones((batch_size, 1), dtype=bool, device=device)
+            seqs = seqs[:, 0].unsqueeze(dim=1)
         elif self.return_type == 'mean':
             # Take the mean
-            mask = torch.ones((mask.shape[0], 1), dtype=bool, device=mask.device)
-            return seqs.mean(dim=1, keepdim=True), mask
+            mask = torch.ones((batch_size, 1), dtype=bool, device=device)
+            seqs = seqs.mean(dim=1, keepdim=True)
         elif self.return_type == 'full':
             # Return full sequence
-            return seqs, mask
+            pass
         else:
             raise ValueError(f'Unrecognized return type {self.return_type}')
+
+        if unconditioned is not None:
+            index = torch.rand(batch_size) < unconditioned
+            seqs[index] = torch.zeros_like(seqs[index])
+            mask[index] = torch.ones_like(mask[index])
+        
+        return seqs, mask

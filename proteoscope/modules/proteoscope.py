@@ -103,11 +103,9 @@ class ProteoscopeLM(LightningModule):
         self.psnr = PSNR()
         self.results = []
 
-    def forward(self, batch):
-        unconditioned = torch.rand(1) < self.unconditioned_probability
-        
+    def forward(self, batch):        
         seq_embeds, seq_mask = self.esm_bottleneck(
-            batch["sequence_embed"], batch["sequence_mask"], unconditioned
+            batch["sequence_embed"], batch["sequence_mask"], self.unconditioned_probability
         )
 
         if self.cond_images:

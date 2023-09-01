@@ -15,7 +15,7 @@ latents_init_scale: 2.895
 cond_latents_init_scale: 11.29
 guidance_scale: 2.0
 ema_decay: 0.9999
-ema_update_after_step: 8_000
+ema_update_after_step: 1_000
 scheduler: ddim
 esm_bottleneck:
   d_init: 1280
@@ -23,9 +23,8 @@ esm_bottleneck:
   nhead: 4
   num_encoder_layers: 3
   dim_feedforward: 256
-  dropout: 0.4
-  return_type: 'token'
-  unconditioned_type: 'token'
+  dropout: 0.2
+  return_type: 'full'
 autoencoder:
   checkpoint: /home/ec2-user/outputs/autoencoder/2023-08-19/17-28-45/checkpoints/last.ckpt # 2023-08-17/05-03-37
   model:
