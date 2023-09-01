@@ -1,4 +1,4 @@
-learning_rate: 4e-4 # 0.001
+learning_rate: 1e-4 # 0.001
 learning_rate_min_factor: 0.1
 beta_1: 0.9
 beta_2: 0.98
