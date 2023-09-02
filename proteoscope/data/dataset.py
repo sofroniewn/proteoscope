@@ -40,12 +40,12 @@ class ProteoscopeDataset(Dataset):
         if self.split_protein is not None and self.split_images is not None:
             self.labels = labels[
                 (labels["split_protein"] == self.split_protein)
-                & (labels["split_images"] == self.split_images)
+                & (labels["split_images_fov"] == self.split_images)
             ]
         elif self.split_protein is not None:
             self.labels = labels[(labels["split_protein"] == self.split_protein)]
         elif self.split_images is not None:
-            self.labels = labels[(labels["split_images"] == self.split_images)]
+            self.labels = labels[(labels["split_images_fov"] == self.split_images)]
         else:
             self.labels = labels
 

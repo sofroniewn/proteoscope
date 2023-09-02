@@ -4,8 +4,8 @@ gradient_clip_val: null
 precision: 16-mixed # 16
 val_check_interval: 600 # number of actual (not effective) batches
 limit_val_batches: 2 # number of actual (not effective) batches
-log_every_n_steps: 4 # number of actual (not effective) batches
+log_every_n_steps: 8 # number of actual (not effective) batches
 batch_size: 16 # for effective batch size multiply batch_size * num_devices * accumulate
 num_workers: 12
 accumulate: 4
-max_steps: 28_690
+max_steps: 60_000 # 30_000
