@@ -1,16 +1,16 @@
-model_type: cytoself #cytoself proteoscope autoencoder
+model_type: proteoscope #cytoself proteoscope autoencoder
 
 defaults:
   - _self_
   - data: data
   - module/optimizer: adamw
   - trainer: cuda
-  - module/model: cytoself
-  - splits: all_proteins # all_proteins, standard, train_proteins
+  - module/model: proteoscope
+  - splits: standard # all_proteins, standard, train_proteins
 
 hydra:
   run:
-    dir: /home/ec2-user/outputs/cytoself/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    dir: /home/ec2-user/outputs/proteoscope/${now:%Y-%m-%d}/${now:%H-%M-%S}
 
 chkpt: null # /home/ec2-user/outputs/proteoscope/2023-09-01/15-09-02/checkpoints/last.ckpt # null
 module:

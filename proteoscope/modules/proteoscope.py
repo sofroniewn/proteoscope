@@ -198,6 +198,7 @@ class ProteoscopeLM(LightningModule):
             batch,
             guidance_scale=self.guidance_scale,
             num_inference_steps=self.num_val_timesteps,
+            seed=42,
         )
         output_images = self.autoencoder.decode(output_latents).sample.clip(0, 1)
 
