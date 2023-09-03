@@ -20,6 +20,7 @@ class ProteoscopeDataset(Dataset):
         sequence_embedding=None,
         shuffle=None,
         sequence_dropout=None,
+        downsample=None,
         transform: Optional[Sequence] = (
             transforms.RandomApply(
                 [
@@ -51,6 +52,9 @@ class ProteoscopeDataset(Dataset):
 
         if unique_protein:
             self.labels = self.labels.drop_duplicates(subset="ensg")
+
+        if downsample is not None:
+            self.labels = self.labels[::downsample]
 
         self.num_label_class = len(self.labels["label"].unique())
 

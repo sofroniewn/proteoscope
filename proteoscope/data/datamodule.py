@@ -137,8 +137,9 @@ class ProteoscopeDM(LightningDataModule):
         split_protein=None,
         split_images=None,
         unique_protein=False,
-        shuffle=False,
+        shuffle=None,
         batch_size=None,
+        downsample=None
     ):
         dataset = ProteoscopeDataset(
             images=self.images,
@@ -148,8 +149,10 @@ class ProteoscopeDM(LightningDataModule):
             split_images=split_images,
             unique_protein=unique_protein,
             transform=None,
+            shuffle=shuffle,
             trim=self.trim,
             sequence_embedding=self.sequence_embedding,
+            downsample=downsample,
         )
         if batch_size is None:
             batch_size = self.batch_size
@@ -157,7 +160,7 @@ class ProteoscopeDM(LightningDataModule):
         return DataLoader(
             dataset,
             batch_size=batch_size,
-            shuffle=shuffle,
+            shuffle=False,
             num_workers=self.num_workers,
             pin_memory=True,
         )
