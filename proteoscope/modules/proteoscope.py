@@ -21,6 +21,21 @@ def combine_images(img_set1, img_set2):
     return torch.cat([row1, row2], dim=0)
 
 
+class LinearRampScheduler:
+    def __init__(self, initial_steps, ramp_steps):
+        self.initial_steps = initial_steps
+        self.ramp_steps = ramp_steps
+
+    def get_val(self, current_step):
+        if current_step <= self.initial_steps:
+            return 0.0
+        elif current_step <= self.initial_steps + self.ramp_steps:
+            progress = (current_step - self.initial_steps) / self.ramp_steps
+            return progress
+        else:
+            return 1.0
+
+
 class ProteoscopeLM(LightningModule):
     def __init__(
         self,
@@ -47,7 +62,16 @@ class ProteoscopeLM(LightningModule):
             module_config.model.sample_size,
             module_config.model.sample_size,
         )
-        self.unconditioned_probability = module_config.model.unconditioned_probability
+        if module_config.model.sequence_condition_probability is not None:
+            self.sequence_condition_probability = 1.0 - module_config.model.sequence_condition_probability
+        else:
+            self.sequence_condition_probability = 0.0
+
+        if module_config.model.unconditioned_initial_steps is not None and module_config.model.sequence_condition_ramp_steps is not None:
+            self.sequence_condition_scheduler = LinearRampScheduler(module_config.model.unconditioned_initial_steps, module_config.model.sequence_condition_ramp_steps)
+        else:
+            self.sequence_condition_scheduler = None
+
         self.latents_init_scale = module_config.model.latents_init_scale
         self.cond_latents_init_scale = module_config.model.cond_latents_init_scale
         self.guidance_scale = module_config.model.guidance_scale
@@ -103,9 +127,9 @@ class ProteoscopeLM(LightningModule):
         self.psnr = PSNR()
         self.results = []
 
-    def forward(self, batch):        
+    def forward(self, batch, sequence_condition_probability=1.0):        
         seq_embeds, seq_mask = self.esm_bottleneck(
-            batch["sequence_embed"], batch["sequence_mask"], self.unconditioned_probability
+            batch["sequence_embed"], batch["sequence_mask"], sequence_condition_probability
         )
 
         if self.cond_images:
@@ -169,14 +193,25 @@ class ProteoscopeLM(LightningModule):
         return loss
 
     def training_step(self, batch, batch_idx, dataloader_idx=0):
-        loss = self(batch)
+        scp = self.sequence_condition_probability
+        if self.sequence_condition_scheduler is not None:
+            scp = scp * self.sequence_condition_scheduler.get_val(self.global_step)
+        loss = self(batch, scp)
+
         self.log(
             "train_loss", loss, on_step=True, on_epoch=False, prog_bar=True, logger=True
+        )
+
+        self.log(
+            "sequence_condition_probability", scp, on_step=True, on_epoch=False, prog_bar=True, logger=True
         )
         return loss
 
     def validation_step(self, batch, batch_idx, dataloader_idx=0):
-        loss = self(batch)
+        scp = self.sequence_condition_probability
+        if self.sequence_condition_scheduler is not None:
+            scp = scp * self.sequence_condition_scheduler.get_val(self.global_step)
+        loss = self(batch, scp)
 
         if dataloader_idx == 1:
             extra = "_train"

@@ -34,7 +34,7 @@ class ESMBottleneck(nn.Module):
 
         self.return_type = config.return_type
 
-    def forward(self, seqs, mask, unconditioned=None):
+    def forward(self, seqs, mask, sequence_condition_probability=1.0):
         batch_size = seqs.shape[0]
         device = seqs.device
 
@@ -69,8 +69,8 @@ class ESMBottleneck(nn.Module):
         else:
             raise ValueError(f'Unrecognized return type {self.return_type}')
 
-        if unconditioned is not None:
-            index = torch.rand(batch_size) < unconditioned
+        if sequence_condition_probability < 1.0:
+            index = torch.rand(batch_size) < 1.0 - sequence_condition_probability
             seqs[index] = torch.zeros_like(seqs[index])
             mask[index] = torch.ones_like(mask[index])
         

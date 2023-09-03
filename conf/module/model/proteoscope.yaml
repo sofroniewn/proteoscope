@@ -10,7 +10,9 @@ cross_attention_dim: 64
 num_train_timesteps: 1000
 num_val_timesteps: 50
 cond_images: True
-unconditioned_probability: 0.8
+sequence_condition_probability: 0.8
+unconditioned_initial_steps: 4000
+sequence_condition_ramp_steps: 400
 latents_init_scale: 2.895
 cond_latents_init_scale: 11.29
 guidance_scale: 3.0
