@@ -12,7 +12,7 @@ hydra:
   run:
     dir: /home/ec2-user/outputs/proteoscope/${now:%Y-%m-%d}/${now:%H-%M-%S}
 
-chkpt: null # /home/ec2-user/outputs/proteoscope/2023-09-01/15-09-02/checkpoints/last.ckpt # null
+chkpt: null #/home/ec2-user/outputs/proteoscope/2023-09-03/22-12-44/checkpoints/epoch=1-step=3900.ckpt #last.ckpt # null
 module:
   dropout: 0.2
   image_height: 100

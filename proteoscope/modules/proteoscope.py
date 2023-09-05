@@ -1,8 +1,10 @@
 import torch
 import torch.nn.functional as F
+import torch.nn as nn
 import torch.optim as optim
 from diffusers import DDPMScheduler, DDIMScheduler, UNet2DConditionModel
 from diffusers.optimization import get_cosine_schedule_with_warmup
+from diffusers.models.attention import BasicTransformerBlock
 from piqa import SSIM, PSNR
 from pytorch_lightning import LightningModule
 from tqdm.auto import tqdm
@@ -19,6 +21,23 @@ def combine_images(img_set1, img_set2):
     row1 = torch.cat(img_set1.chunk(n, dim=0), dim=2).squeeze(0)
     row2 = torch.cat(img_set2.chunk(n, dim=0), dim=2).squeeze(0)
     return torch.cat([row1, row2], dim=0)
+
+
+def zero_weights_init(m):
+    if isinstance(m, (nn.Linear, nn.LayerNorm, nn.GroupNorm)):
+        m.weight.data.fill_(0)
+        if m.bias is not None:
+            m.bias.data.fill_(0)
+
+
+def freeze_cross_attention(model):
+    for module in model.modules():
+        if isinstance(module, BasicTransformerBlock):
+            crossattention = module.attn2
+            if crossattention is not None:
+                crossattention.apply(zero_weights_init)
+                for param in crossattention.parameters():
+                    param.requires_grad = False
 
 
 class LinearRampScheduler:
@@ -63,7 +82,7 @@ class ProteoscopeLM(LightningModule):
             module_config.model.sample_size,
         )
         if module_config.model.sequence_condition_probability is not None:
-            self.sequence_condition_probability = 1.0 - module_config.model.sequence_condition_probability
+            self.sequence_condition_probability = module_config.model.sequence_condition_probability
         else:
             self.sequence_condition_probability = 0.0
 
@@ -80,6 +99,10 @@ class ProteoscopeLM(LightningModule):
 
         self.esm_bottleneck = ESMBottleneck(module_config.model.esm_bottleneck)
 
+        self.freeze_cross_attention = module_config.model.freeze_cross_attention
+        if self.freeze_cross_attention:
+            freeze_cross_attention(self.unet)
+            
         if module_config.model.scheduler == "ddpm":
             self.noise_scheduler = DDPMScheduler(
                 num_train_timesteps=module_config.model.num_train_timesteps,
@@ -193,9 +216,12 @@ class ProteoscopeLM(LightningModule):
         return loss
 
     def training_step(self, batch, batch_idx, dataloader_idx=0):
-        scp = self.sequence_condition_probability
-        if self.sequence_condition_scheduler is not None:
-            scp = scp * self.sequence_condition_scheduler.get_val(self.global_step)
+        if self.freeze_cross_attention:
+            scp = 0.0
+        else:
+            scp = self.sequence_condition_probability
+            if self.sequence_condition_scheduler is not None:
+                scp = scp * self.sequence_condition_scheduler.get_val(self.global_step)
         loss = self(batch, scp)
 
         self.log(
@@ -208,9 +234,12 @@ class ProteoscopeLM(LightningModule):
         return loss
 
     def validation_step(self, batch, batch_idx, dataloader_idx=0):
-        scp = self.sequence_condition_probability
-        if self.sequence_condition_scheduler is not None:
-            scp = scp * self.sequence_condition_scheduler.get_val(self.global_step)
+        if self.freeze_cross_attention:
+            scp = 0.0
+        else:
+            scp = self.sequence_condition_probability
+            if self.sequence_condition_scheduler is not None:
+                scp = scp * self.sequence_condition_scheduler.get_val(self.global_step)
         loss = self(batch, scp)
 
         if dataloader_idx == 1:
@@ -409,7 +438,10 @@ class ProteoscopeLM(LightningModule):
         return scores
 
     def configure_optimizers(self):
-        params = list(self.unet.parameters()) + list(self.esm_bottleneck.parameters())
+        if self.freeze_cross_attention:
+            params = [p for p in self.unet.parameters() if p.requires_grad]
+        else:
+            params = list(self.unet.parameters()) + list(self.esm_bottleneck.parameters())
 
         optimizer = optim.AdamW(
             params,

@@ -6,13 +6,14 @@ block_out_channels: [128, 256, 512]
 latent_channels: 4
 down_block_types: ['CrossAttnDownBlock2D', 'CrossAttnDownBlock2D', 'DownBlock2D']
 up_block_types: ['UpBlock2D', 'CrossAttnUpBlock2D', 'CrossAttnUpBlock2D']
-cross_attention_dim: 64
+cross_attention_dim: 1280
 num_train_timesteps: 1000
 num_val_timesteps: 50
 cond_images: True
-sequence_condition_probability: 0.8
-unconditioned_initial_steps: 4000
-sequence_condition_ramp_steps: 400
+freeze_cross_attention: True
+sequence_condition_probability: 0.0
+unconditioned_initial_steps: null
+sequence_condition_ramp_steps: null
 latents_init_scale: 2.895
 cond_latents_init_scale: 11.29
 guidance_scale: 3.0
@@ -21,12 +22,12 @@ ema_update_after_step: 1_000
 scheduler: ddim
 esm_bottleneck:
   d_init: 1280
-  d_model: 64 # cross_attention_dim
+  d_model: 0 # cross_attention_dim
   nhead: 4
-  num_encoder_layers: 3
+  num_encoder_layers: 0
   dim_feedforward: 256
   dropout: 0.2
-  return_type: 'token'
+  return_type: 'full'
 autoencoder:
   checkpoint: /home/ec2-user/outputs/autoencoder/2023-08-19/17-28-45/checkpoints/last.ckpt # 2023-08-17/05-03-37
   model:
