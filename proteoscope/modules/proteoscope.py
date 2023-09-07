@@ -40,6 +40,40 @@ def freeze_cross_attention(model):
                     param.requires_grad = False
 
 
+def all_requires_grad(model):
+    for module in model.modules():
+        for param in module.parameters():
+            param.requires_grad = True
+
+
+def default_weights_init(m):
+    if isinstance(m, nn.Linear):
+        nn.init.kaiming_uniform_(m.weight)
+        if m.bias is not None:
+            nn.init.zeros_(m.bias)
+    elif isinstance(m, (nn.LayerNorm, nn.GroupNorm)):
+        nn.init.ones_(m.weight)
+        if m.bias is not None:
+            nn.init.zeros_(m.bias)
+
+
+def only_cross_attention(model):
+    for module in model.modules():
+        for param in module.parameters():
+            param.requires_grad = True
+    for module in model.modules():
+        if isinstance(module, BasicTransformerBlock):
+            crossattention = module.attn2
+            if crossattention is not None:
+                crossattention.apply(default_weights_init)
+                # for param in crossattention.parameters():
+                #     param.requires_grad = True
+                # for param in module.norm2.parameters():
+                #     param.requires_grad = True
+                # for param in module.ff.parameters():
+                #     param.requires_grad = True
+
+
 class LinearRampScheduler:
     def __init__(self, initial_steps, ramp_steps):
         self.initial_steps = initial_steps
@@ -100,9 +134,8 @@ class ProteoscopeLM(LightningModule):
         self.esm_bottleneck = ESMBottleneck(module_config.model.esm_bottleneck)
 
         self.freeze_cross_attention = module_config.model.freeze_cross_attention
-        if self.freeze_cross_attention:
-            freeze_cross_attention(self.unet)
-            
+        self.only_cross_attention = module_config.model.only_cross_attention
+
         if module_config.model.scheduler == "ddpm":
             self.noise_scheduler = DDPMScheduler(
                 num_train_timesteps=module_config.model.num_train_timesteps,
@@ -439,9 +472,17 @@ class ProteoscopeLM(LightningModule):
 
     def configure_optimizers(self):
         if self.freeze_cross_attention:
-            params = [p for p in self.unet.parameters() if p.requires_grad]
-        else:
-            params = list(self.unet.parameters()) + list(self.esm_bottleneck.parameters())
+            freeze_cross_attention(self.unet)
+            freeze_cross_attention(self.esm_bottleneck)
+
+        if self.only_cross_attention:
+            only_cross_attention(self.unet)
+            all_requires_grad(self.esm_bottleneck)
+
+        params = list(self.unet.parameters()) + list(self.esm_bottleneck.parameters())
+
+        if self.freeze_cross_attention or self.only_cross_attention:
+            params = [p for p in params if p.requires_grad]
 
         optimizer = optim.AdamW(
             params,

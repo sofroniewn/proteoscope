@@ -28,6 +28,14 @@ def train_proteoscope(config: ProteoscopeConfig) -> None:
     print(clm)
     print(f"Train samples {len(pdm.train_dataset)}, Val samples {len(pdm.val_dataset)}")
 
+    if config.reset:
+        checkpoint = torch.load(config.chkpt)
+        clm.load_state_dict(checkpoint['state_dict'])
+        del checkpoint
+        ckpt_path = None
+    else:
+        ckpt_path = config.chkpt
+
     checkpoint_callback = ModelCheckpoint(
         save_top_k=2, monitor="val_loss", mode="min", save_last=True
     )
@@ -54,9 +62,10 @@ def train_proteoscope(config: ProteoscopeConfig) -> None:
         gradient_clip_val=config.trainer.gradient_clip_val,
         deterministic=False,
     )
+
     trainer.fit(
         clm,
-        ckpt_path=config.chkpt,
+        ckpt_path=ckpt_path,
         train_dataloaders=pdm.train_dataloader(),
         val_dataloaders=[pdm.val_dataloader(), pdm.train_dataloader()],
     )
