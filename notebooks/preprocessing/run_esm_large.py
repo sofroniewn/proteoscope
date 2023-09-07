@@ -141,21 +141,21 @@ if __name__ == "__main__":
     #     truncation_seq_length=1024
     # )
 
-    model_config = ModelConfig(
-        name="esm2_t36_3B_UR50D",
-        embedding_layer=36,
-        embed_dim=2560,
-        tokens_per_batch=1024,
-        truncation_seq_length=1024
-    )
-
     # model_config = ModelConfig(
-    #     name="esm2_t48_15B_UR50D",
-    #     embedding_layer=48,
-    #     embed_dim=5120,
+    #     name="esm2_t36_3B_UR50D",
+    #     embedding_layer=36,
+    #     embed_dim=2560,
     #     tokens_per_batch=1024,
     #     truncation_seq_length=1024
     # )
+
+    model_config = ModelConfig(
+        name="esm2_t48_15B_UR50D",
+        embedding_layer=48,
+        embed_dim=5120,
+        tokens_per_batch=512,
+        truncation_seq_length=1024
+    )
 
     # Initialize DataModule and Model
     gene_to_protein = pd.read_csv(GENE2PROTEIN_PATH)
