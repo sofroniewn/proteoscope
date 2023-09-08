@@ -141,3 +141,92 @@ class ProteoscopeDataset(Dataset):
                 ]
                 item["sequence_mask"] = torch.ones(1, dtype=torch.bool)
         return item
+
+
+class ProteolocDataset(Dataset):
+    def __init__(
+        self,
+        labels,
+        split_protein: Optional[str] = None,
+        sequences=None,
+        unique_protein=False,
+        sequence_embedding=None,
+        sequence_dropout=None,
+        downsample=None,
+        shuffle=None,
+    ) -> None:
+        super(Dataset, self).__init__()
+
+        self.split_protein = split_protein
+        if self.split_protein is not None:
+            self.labels = labels[labels["split"] == self.split_protein]
+        else:
+            self.labels = labels
+
+        if unique_protein:
+            self.labels = self.labels.drop_duplicates(subset="Peptide")
+
+        if downsample is not None:
+            self.labels = self.labels[::downsample]
+
+        self.num_label_class = len(self.labels["loc"].unique())
+
+
+        self.sequences = sequences
+        self.sequence_embedding = sequence_embedding
+        self.sequence_dropout = sequence_dropout
+        if shuffle is not None:
+            self.shuffle = np.random.RandomState(seed=shuffle).permutation(
+                len(self.labels)
+            )
+        else:
+            self.shuffle = None
+
+    def __len__(self) -> int:
+        return len(self.labels)
+
+    def __getitem__(self, idx: int) -> Dict[str, Union[Tensor, int, str]]:
+        if self.shuffle is not None:
+            idx = self.shuffle[idx]
+
+        row = self.labels.iloc[idx]
+        index = row.name
+
+        item = dict()
+        item["index"] = index
+        item["peptide"] = row["Peptide"]
+        item["truncation"] = row["Length"]
+        item["localization"] = row["loc"]
+
+        if self.sequences is not None and self.sequence_embedding is not None:
+            if self.sequence_embedding == "ESM-mean":
+                item["sequence_embed"] = self.sequences[
+                    item["index"], 1 : 1 + item["truncation"]
+                ].mean(axis=0)[None, ...]
+                item["sequence_mask"] = torch.ones(1, dtype=torch.bool)
+            elif self.sequence_embedding == "one-hot":
+                item["sequence_embed"] = torch.zeros((1, 1280))
+                item["sequence_embed"][0, item["label"]] = 1.0
+                item["sequence_mask"] = torch.ones(1, dtype=torch.bool)
+            elif self.sequence_embedding == "random":
+                item["sequence_embed"] = torch.randn((1, 1280))
+                item["sequence_mask"] = torch.ones(1, dtype=torch.bool)
+            elif self.sequence_embedding == "ESM-full":
+                item["sequence_embed"] = self.sequences[item["index"], 1:]
+                item["sequence_mask"] = torch.zeros(
+                    len(item["sequence_embed"]), dtype=torch.bool
+                )
+                item["sequence_mask"][: item["truncation"]] = True
+
+                if self.sequence_dropout is not None:
+                    dropout = torch.rand(1) * self.sequence_dropout
+                    num_to_flip = int(dropout * item["truncation"])
+                    random_indices = torch.randperm(item["truncation"])[:num_to_flip]
+                    item["sequence_mask"][random_indices] = False
+
+            elif self.sequence_embedding == "ESM-bos":
+                item["sequence_embed"] = self.sequences[item["index"], 0][
+                    None, ...
+                ]
+                item["sequence_mask"] = torch.ones(1, dtype=torch.bool)
+        return item
