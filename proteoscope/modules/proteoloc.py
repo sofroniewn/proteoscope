@@ -22,7 +22,9 @@ class ProteolocLM(LightningModule):
         seq_embeds, seq_mask = self.esm_bottleneck(
             batch["sequence_embed"], batch["sequence_mask"]
         )
-        embeds = seq_embeds.squeeze(-2)
+        seq_embeds[~seq_mask] = 0
+        embeds = seq_embeds.sum(dim=-2) / batch['truncation'][:, None]
+
         logits = self.prediction_head(embeds)
         return logits
 

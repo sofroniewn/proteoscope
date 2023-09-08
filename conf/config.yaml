@@ -4,7 +4,7 @@ defaults:
   - _self_
   - data: data-loc # data 
   - module/optimizer: adamw
-  - trainer: cuda
+  - trainer: cuda-loc # cuda
   - module/model: proteoloc
   - splits: standard # all_proteins, standard, train_proteins
 

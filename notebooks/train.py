@@ -1,7 +1,7 @@
 import hydra
 from hydra.core.config_store import ConfigStore
 
-from proteoscope import ProteoscopeConfig, train_cytoself, train_proteoscope
+from proteoscope import ProteoscopeConfig, train_cytoself, train_proteoscope, train_proteoloc
 
 cs = ConfigStore.instance()
 cs.store(name="rosa_config", node=ProteoscopeConfig)
@@ -17,6 +17,8 @@ def main(config: ProteoscopeConfig) -> None:
     print("Working directory : {}".format(os.getcwd()))
     if config.model_type == "proteoscope":
         train_proteoscope(config)
+    elif config.model_type == "proteoloc":
+        train_proteoloc(config)
     elif config.model_type in ["cytoself", "autoencoder"]:
         train_cytoself(config)
     else:

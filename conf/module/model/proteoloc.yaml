@@ -1,8 +1,8 @@
 d_init: 1280
-d_model: 64 # cross_attention_dim
+d_model: 256 # cross_attention_dim
 nhead: 4
 num_encoder_layers: 3
-dim_feedforward: 256
+dim_feedforward: 1024
 dropout: 0.2
-return_type: 'token'
+return_type: 'full'
 num_class: 10

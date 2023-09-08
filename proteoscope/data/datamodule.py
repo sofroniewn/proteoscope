@@ -215,10 +215,10 @@ class ProteolocDM(LightningDataModule):
             sequence_embedding=self.sequence_embedding,
         )
 
-        self.val_train_dataset = ProteolocDataset(
+        self.test_dataset = ProteolocDataset(
             labels=self.labels,
             sequences=self.sequences,
-            split_protein='train',
+            split_protein='test',
             shuffle=42,  # Seed value for shuffle
             sequence_embedding=self.sequence_embedding,
         )
@@ -250,9 +250,9 @@ class ProteolocDM(LightningDataModule):
             pin_memory=True,
         )
 
-    def val_train_dataloader(self):
+    def test_dataloader(self):
         return DataLoader(
-            self.val_train_dataset,
+            self.test_dataset,
             batch_size=self.batch_size,
             shuffle=False,
             num_workers=self.num_workers,

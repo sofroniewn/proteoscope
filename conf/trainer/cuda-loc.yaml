@@ -1,0 +1,11 @@
+device: cuda
+num_devices: 1 #8
+gradient_clip_val: null
+precision: 16-mixed # 16
+val_check_interval: 40 # number of actual (not effective) batches
+limit_val_batches: 10 # number of actual (not effective) batches
+log_every_n_steps: 1 # number of actual (not effective) batches
+batch_size: 256 # 16 # for effective batch size multiply batch_size * num_devices * accumulate
+num_workers: 2
+accumulate: 1 # 4
+max_steps: 30_000 # => 20 epochs 30_000
