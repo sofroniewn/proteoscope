@@ -72,23 +72,23 @@ class ESMModel(pl.LightningModule):
 
 
 class ESMDataModule(pl.LightningDataModule):
-    def __init__(self, gene_to_protein, model_config):
+    def __init__(self, sequences_df, model_config):
         super(ESMDataModule, self).__init__()
         # sequences = gene_to_protein['Peptide']
         sequences = (
-            gene_to_protein["Peptide"].apply(lambda x: x.replace("*", "")).values
+            sequences_df["Peptide"].apply(lambda x: x.replace("*", "")).values
         )
-        genes = gene_to_protein.index.values
-        self.num_genes = len(genes)
+        index = sequences_df.index.values
+        self.num_sequences = len(index)
 
-        self.genes = genes
+        self.index = index
         self.sequences = sequences
         self.alphabet = None
         self.tokens_per_batch = model_config.tokens_per_batch
         self.truncation_seq_length = model_config.truncation_seq_length
 
     def predict_dataloader(self):
-        dataset = esm.data.FastaBatchedDataset(self.genes, self.sequences)
+        dataset = esm.data.FastaBatchedDataset(self.index, self.sequences)
         batches = dataset.get_batch_indices(self.tokens_per_batch, extra_toks_per_seq=1)
 
         # Use batches list directly with BatchSampler
@@ -130,16 +130,19 @@ class CustomWriter(BasePredictionWriter):
 
 
 if __name__ == "__main__":
-    GENE2PROTEIN_PATH = "/home/ec2-user/cytoself-data/sequences.csv"
-    PROTEIN_EMBED_PATH = "/home/ec2-user/cytoself-data/"
+    # GENE2PROTEIN_PATH = "/home/ec2-user/cytoself-data/sequences.csv"
+    # PROTEIN_EMBED_PATH = "/home/ec2-user/cytoself-data/"
 
-    # model_config = ModelConfig(
-    #     name="esm2_t33_650M_UR50D",
-    #     embedding_layer=33,
-    #     embed_dim=1280,
-    #     tokens_per_batch=1024,
-    #     truncation_seq_length=1024
-    # )
+    SEQ_LOC_PATH = "/home/ec2-user/esm-data/protein_loc.csv"
+    PROTEIN_EMBED_PATH = "/home/ec2-user/esm-data/"
+
+    model_config = ModelConfig(
+        name="esm2_t33_650M_UR50D",
+        embedding_layer=33,
+        embed_dim=1280,
+        tokens_per_batch=1024,
+        truncation_seq_length=1024
+    )
 
     # model_config = ModelConfig(
     #     name="esm2_t36_3B_UR50D",
@@ -149,20 +152,22 @@ if __name__ == "__main__":
     #     truncation_seq_length=1024
     # )
 
-    model_config = ModelConfig(
-        name="esm2_t48_15B_UR50D",
-        embedding_layer=48,
-        embed_dim=5120,
-        tokens_per_batch=512,
-        truncation_seq_length=1024
-    )
+    # model_config = ModelConfig(
+    #     name="esm2_t48_15B_UR50D",
+    #     embedding_layer=48,
+    #     embed_dim=5120,
+    #     tokens_per_batch=512,
+    #     truncation_seq_length=1024
+    # )
 
     # Initialize DataModule and Model
-    gene_to_protein = pd.read_csv(GENE2PROTEIN_PATH)
-    gene_to_protein = gene_to_protein.append(gene_to_protein.iloc[-1]) # make divisible by 4 !!!!
-    data_module = ESMDataModule(gene_to_protein, model_config)
+    # gene_to_protein = pd.read_csv(GENE2PROTEIN_PATH)
+    # gene_to_protein = gene_to_protein.append(gene_to_protein.iloc[-1]) # make divisible by 4 !!!!
+
+    sequences_df = pd.read_csv(SEQ_LOC_PATH)
+    data_module = ESMDataModule(sequences_df, model_config)
     data_module.alphabet = esm.data.Alphabet.from_architecture("ESM-1b")
-    model = ESMModel(gene_to_protein, model_config)
+    model = ESMModel(sequences_df, model_config)
 
     # Use the Trainer for prediction
     pred_writer = CustomWriter(
