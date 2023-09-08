@@ -1,0 +1,4 @@
+labels_path: '/home/ec2-user/esm-data/protein_loc.csv'
+sequences_path: '/home/ec2-user/cytoself-data/esm2_t33_650M_UR50D.zarr' # esm2_t33_650M_UR50D.zarr esm2_t36_3B_UR50D.zarr# null
+sequence_embedding: 'ESM-full'
+sequence_dropout: null

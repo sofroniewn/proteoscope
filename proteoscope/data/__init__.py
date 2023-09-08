@@ -1,1 +1,1 @@
-from .datamodule import ProteoscopeDM
+from .datamodule import ProteoscopeDM, ProteolocDM
