@@ -158,7 +158,7 @@ class ProteolocDataset(Dataset):
         super(Dataset, self).__init__()
 
         self.split_protein = split_protein
-        if self.split_protein is not None:
+        if self.split_protein is not None and 'split' in labels.columns:
             self.labels = labels[labels["split"] == self.split_protein]
         else:
             self.labels = labels
@@ -169,8 +169,10 @@ class ProteolocDataset(Dataset):
         if downsample is not None:
             self.labels = self.labels[::downsample]
 
-        self.num_label_class = len(self.labels["loc"].unique())
-
+        if 'loc' in labels.columns:
+            self.num_label_class = len(self.labels["loc"].unique())
+        else:
+            self.num_label_class = 0
 
         self.sequences = sequences
         self.sequence_embedding = sequence_embedding
@@ -196,12 +198,15 @@ class ProteolocDataset(Dataset):
         item["index"] = index
         item["peptide"] = row["Peptide"]
         item["truncation"] = row["Length"]
-        item["localization"] = row["loc"]
+        if 'loc' in row.keys():
+            item["localization"] = row["loc"]
+
+        seq_index = idx
 
         if self.sequences is not None and self.sequence_embedding is not None:
             if self.sequence_embedding == "ESM-mean":
                 item["sequence_embed"] = self.sequences[
-                    item["index"], 1 : 1 + item["truncation"]
+                    seq_index, 1 : 1 + item["truncation"]
                 ].mean(axis=0)[None, ...]
                 item["sequence_mask"] = torch.ones(1, dtype=torch.bool)
             elif self.sequence_embedding == "one-hot":
@@ -212,7 +217,7 @@ class ProteolocDataset(Dataset):
                 item["sequence_embed"] = torch.randn((1, 1280))
                 item["sequence_mask"] = torch.ones(1, dtype=torch.bool)
             elif self.sequence_embedding == "ESM-full":
-                item["sequence_embed"] = self.sequences[item["index"], 1:]
+                item["sequence_embed"] = self.sequences[seq_index, 1:]
                 item["sequence_mask"] = torch.zeros(
                     len(item["sequence_embed"]), dtype=torch.bool
                 )
@@ -225,7 +230,7 @@ class ProteolocDataset(Dataset):
                     item["sequence_mask"][random_indices] = False
 
             elif self.sequence_embedding == "ESM-bos":
-                item["sequence_embed"] = self.sequences[item["index"], 0][
+                item["sequence_embed"] = self.sequences[seq_index, 0][
                     None, ...
                 ]
                 item["sequence_mask"] = torch.ones(1, dtype=torch.bool)
