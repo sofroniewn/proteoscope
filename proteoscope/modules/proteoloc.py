@@ -5,6 +5,7 @@ import torch.optim as optim
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from pytorch_lightning import LightningModule
 from .esm_bottleneck import ESMBottleneck
+import esm
 
 
 class ProteolocLM(LightningModule):
@@ -13,18 +14,42 @@ class ProteolocLM(LightningModule):
         module_config,
     ):
         super(ProteolocLM, self).__init__()
-        self.esm_bottleneck = ESMBottleneck(module_config.model)
+        if module_config.model.esm_model is None:
+            self.esm_bottleneck = ESMBottleneck(module_config.model)
+            self.esm = None
+            self.converter = None
+        else:
+            self.esm, alphabet = esm.pretrained.load_model_and_alphabet_hub(module_config.model.esm_model)
+            self.converter = alphabet.get_batch_converter(module_config.model.truncation_seq_length)
+            self.embedding_layer = module_config.model.embedding_layer
+            self.esm_bottleneck = None
+
         self.prediction_head = nn.Linear(module_config.model.d_model, module_config.model.num_class)
         self.optim_config = module_config.optimizer
         self.criterion = nn.CrossEntropyLoss()
 
-    def forward(self, batch):        
-        seq_embeds, seq_mask = self.esm_bottleneck(
-            batch["sequence_embed"], batch["sequence_mask"]
-        )
+    def embed(self, batch):
+        if self.esm is not None:
+            labels = batch['index']
+            sequence = batch['peptide']
+            result = list(zip(labels, sequence))
+            labels, strs, toks = self.converter(result)
+            toks = toks.to(self.device)
+            out = self.esm(toks, repr_layers=[self.embedding_layer], return_contacts=False)
+            seq_embeds = out["representations"][self.embedding_layer]
+            seq_mask = torch.zeros_like(seq_embeds).bool()
+            for i, ind in enumerate(batch['truncation']):
+                seq_mask[i, 1:ind+1] = True
+        else:
+            seq_embeds, seq_mask = self.esm_bottleneck(
+                batch["sequence_embed"], batch["sequence_mask"]
+            )
         seq_embeds[~seq_mask] = 0
         embeds = seq_embeds.sum(dim=-2) / batch['truncation'][:, None]
+        return embeds
 
+    def forward(self, batch):        
+        embeds = self.embed(batch)
         logits = self.prediction_head(embeds)
         return logits
 
@@ -53,7 +78,10 @@ class ProteolocLM(LightningModule):
         )
 
     def configure_optimizers(self):
-        params = list(self.prediction_head.parameters()) + list(self.esm_bottleneck.parameters())
+        if self.esm is None:
+            params = list(self.prediction_head.parameters()) + list(self.esm_bottleneck.parameters())
+        else:
+            params = list(self.prediction_head.parameters()) + list(self.esm.parameters())
 
         optimizer = optim.AdamW(
             params,

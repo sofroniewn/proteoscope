@@ -1,0 +1,5 @@
+d_model: 1280 # cross_attention_dim
+num_class: 10
+esm_model: 'esm2_t33_650M_UR50D'
+embedding_layer: 33
+truncation_seq_length: 1024

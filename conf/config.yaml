@@ -1,16 +1,16 @@
-model_type: proteoscope #cytoself proteoscope autoencoder proteoloc
+model_type: proteoloc #cytoself proteoscope autoencoder proteoloc
 
 defaults:
   - _self_
-  - data: data # data   data-loc
+  - data: data-loc-esm # data  data-loc data-loc-esm
   - module/optimizer: adamw
-  - trainer: cuda # cuda  cuda-loc
-  - module/model: proteoscope
+  - trainer: cuda-loc-esm # cuda  cuda-loc
+  - module/model: proteoloc-esm # proteoloc-esm
   - splits: standard # all_proteins, standard, train_proteins
 
 hydra:
   run:
-    dir: /home/ec2-user/outputs/proteoscope/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    dir: /home/ec2-user/outputs/proteoloc/${now:%Y-%m-%d}/${now:%H-%M-%S}
 
 chkpt: null #/home/ec2-user/outputs/proteoscope/2023-09-05/04-00-01/checkpoints/last.ckpt #last.ckpt # null
 reset: False # True/ False
