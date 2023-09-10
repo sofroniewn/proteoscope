@@ -6,7 +6,7 @@ block_out_channels: [128, 256, 512]
 latent_channels: 4
 down_block_types: ['CrossAttnDownBlock2D', 'CrossAttnDownBlock2D', 'DownBlock2D']
 up_block_types: ['UpBlock2D', 'CrossAttnUpBlock2D', 'CrossAttnUpBlock2D']
-cross_attention_dim: 256
+cross_attention_dim: 1280
 num_train_timesteps: 1000
 num_val_timesteps: 50
 cond_images: True
@@ -22,7 +22,7 @@ ema_decay: 0.9999
 ema_update_after_step: 1_000
 scheduler: ddim
 esm_bottleneck:
-  d_init: 256
+  d_init: 1280
   d_model: 0 # cross_attention_dim
   nhead: 4
   num_encoder_layers: 0

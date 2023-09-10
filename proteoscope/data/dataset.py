@@ -197,7 +197,7 @@ class ProteolocDataset(Dataset):
         item = dict()
         item["index"] = index
         item["peptide"] = row["Peptide"].replace("*", "")
-        item["truncation"] = row["Length"]
+        item["truncation"] = len(item["peptide"])
         if 'loc' in row.keys():
             item["localization"] = row["loc"]
 

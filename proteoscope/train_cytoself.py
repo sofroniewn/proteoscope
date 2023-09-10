@@ -30,7 +30,7 @@ def train_cytoself(config: ProteoscopeConfig) -> None:
     print(f"Train samples {len(pdm.train_dataset)}, Val samples {len(pdm.val_dataset)}")
 
     checkpoint_callback = ModelCheckpoint(
-        save_top_k=2, monitor="val_loss", mode="min", save_last=True
+        save_top_k=1, monitor="val_loss", mode="min", save_last=True
     )
     lr_monitor_callback = LearningRateMonitor(logging_interval="step")
 

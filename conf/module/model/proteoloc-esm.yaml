@@ -3,3 +3,15 @@ num_class: 10
 esm_model: 'esm2_t33_650M_UR50D'
 embedding_layer: 33
 truncation_seq_length: 1024
+lora:
+  target_modules:
+    - "k_proj"
+    - "v_proj"
+    - "q_proj"
+    - "out_proj"
+    - "fc1"
+    - "fc2"
+  inference_mode: False
+  r: 32
+  lora_alpha: 32
+  lora_dropout: 0.1

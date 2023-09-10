@@ -37,7 +37,7 @@ def train_proteoscope(config: ProteoscopeConfig) -> None:
         ckpt_path = config.chkpt
 
     checkpoint_callback = ModelCheckpoint(
-        save_top_k=2, monitor="val_loss", mode="min", save_last=True
+        save_top_k=1, monitor="val_loss", mode="min", save_last=True
     )
     lr_monitor_callback = LearningRateMonitor(logging_interval="step")
 

@@ -6,6 +6,7 @@ from torch.optim.lr_scheduler import CosineAnnealingLR
 from pytorch_lightning import LightningModule
 from .esm_bottleneck import ESMBottleneck
 import esm
+from peft import LoraConfig, get_peft_model
 
 
 class ProteolocLM(LightningModule):
@@ -20,6 +21,9 @@ class ProteolocLM(LightningModule):
             self.converter = None
         else:
             self.esm, alphabet = esm.pretrained.load_model_and_alphabet_hub(module_config.model.esm_model)
+            if module_config.model.lora is not None:
+                peft_config = LoraConfig(**module_config.model.lora)
+                self.esm = get_peft_model(self.esm, peft_config)
             self.converter = alphabet.get_batch_converter(module_config.model.truncation_seq_length)
             self.embedding_layer = module_config.model.embedding_layer
             self.esm_bottleneck = None
@@ -45,11 +49,11 @@ class ProteolocLM(LightningModule):
                 batch["sequence_embed"], batch["sequence_mask"]
             )
         seq_embeds[~seq_mask] = 0
-        embeds = seq_embeds.sum(dim=-2) / batch['truncation'][:, None]
-        return embeds
+        return seq_embeds
 
     def forward(self, batch):        
-        embeds = self.embed(batch)
+        seq_embeds = self.embed(batch)
+        embeds = seq_embeds.sum(dim=-2) / batch['truncation'][:, None]
         logits = self.prediction_head(embeds)
         return logits
 
