@@ -130,27 +130,27 @@ class CustomWriter(BasePredictionWriter):
 
 
 if __name__ == "__main__":
-    # GENE2PROTEIN_PATH = "/home/ec2-user/cytoself-data/sequences.csv"
-    # PROTEIN_EMBED_PATH = "/home/ec2-user/cytoself-data/"
+    GENE2PROTEIN_PATH = "/home/ec2-user/cytoself-data/sequences.csv"
+    PROTEIN_EMBED_PATH = "/home/ec2-user/cytoself-data/"
 
-    SEQ_LOC_PATH = "/home/ec2-user/esm-data/protein_loc.csv"
-    PROTEIN_EMBED_PATH = "/home/ec2-user/esm-data/"
-
-    model_config = ModelConfig(
-        name="esm2_t33_650M_UR50D",
-        embedding_layer=33,
-        embed_dim=1280,
-        tokens_per_batch=1024,
-        truncation_seq_length=1024
-    )
+    # SEQ_LOC_PATH = "/home/ec2-user/esm-data/protein_loc.csv"
+    # PROTEIN_EMBED_PATH = "/home/ec2-user/esm-data/"
 
     # model_config = ModelConfig(
-    #     name="esm2_t36_3B_UR50D",
-    #     embedding_layer=36,
-    #     embed_dim=2560,
+    #     name="esm2_t33_650M_UR50D",
+    #     embedding_layer=32,
+    #     embed_dim=1280,
     #     tokens_per_batch=1024,
     #     truncation_seq_length=1024
     # )
+
+    model_config = ModelConfig(
+        name="esm2_t36_3B_UR50D",
+        embedding_layer=34,
+        embed_dim=2560,
+        tokens_per_batch=1024,
+        truncation_seq_length=1024
+    )
 
     # model_config = ModelConfig(
     #     name="esm2_t48_15B_UR50D",
@@ -161,17 +161,17 @@ if __name__ == "__main__":
     # )
 
     # Initialize DataModule and Model
-    # gene_to_protein = pd.read_csv(GENE2PROTEIN_PATH)
-    # gene_to_protein = gene_to_protein.append(gene_to_protein.iloc[-1]) # make divisible by 4 !!!!
+    sequences_df = pd.read_csv(GENE2PROTEIN_PATH)
+    sequences_df = sequences_df.append(sequences_df.iloc[-1]) # make divisible by 4 !!!!
 
-    sequences_df = pd.read_csv(SEQ_LOC_PATH)
+    # sequences_df = pd.read_csv(SEQ_LOC_PATH)
     data_module = ESMDataModule(sequences_df, model_config)
     data_module.alphabet = esm.data.Alphabet.from_architecture("ESM-1b")
     model = ESMModel(sequences_df, model_config)
 
     # Use the Trainer for prediction
     pred_writer = CustomWriter(
-        output_dir=os.path.join(PROTEIN_EMBED_PATH, model_config.name),
+        output_dir=os.path.join(PROTEIN_EMBED_PATH, f'{model_config.name}_{model_config.embedding_layer}'),
         write_interval="batch",
     )
     strategy = FSDPStrategy(
