@@ -32,15 +32,16 @@ class ProteolocLM(LightningModule):
         self.optim_config = module_config.optimizer
         self.criterion = nn.CrossEntropyLoss()
 
-    def embed(self, batch):
+    def embed(self, batch, shift_embedding_layer=0):
         if self.esm is not None:
             labels = batch['index']
             sequence = batch['peptide']
             result = list(zip(labels, sequence))
             labels, strs, toks = self.converter(result)
             toks = toks.to(self.device)
-            out = self.esm(toks, repr_layers=[self.embedding_layer], return_contacts=False)
-            seq_embeds = out["representations"][self.embedding_layer]
+            embedding_layer = self.embedding_layer - shift_embedding_layer
+            out = self.esm(toks, repr_layers=[embedding_layer], return_contacts=False)
+            seq_embeds = out["representations"][embedding_layer]
             seq_mask = torch.zeros_like(seq_embeds).bool()
             for i, ind in enumerate(batch['truncation']):
                 seq_mask[i, 1:ind+1] = True

@@ -3,7 +3,6 @@ import torch.nn.functional as F
 import torch.nn as nn
 import torch.optim as optim
 from diffusers import DDPMScheduler, DDIMScheduler, UNet2DConditionModel
-from diffusers.optimization import get_cosine_schedule_with_warmup
 from diffusers.models.attention import BasicTransformerBlock
 from piqa import SSIM, PSNR
 from pytorch_lightning import LightningModule
@@ -14,6 +13,7 @@ from ema_pytorch import EMA
 from .autoencoder import AutoencoderLM
 from .cytoself import CytoselfLM
 from .esm_bottleneck import ESMBottleneck
+from .scheduler import get_cosine_schedule_with_warmup
 
 
 def combine_images(img_set1, img_set2):
@@ -496,6 +496,7 @@ class ProteoscopeLM(LightningModule):
             optimizer,
             num_warmup_steps=self.optim_config.warmup,
             num_training_steps=self.optim_config.max_iters,
+            min_value = self.optim_config.learning_rate_min_factor,
         )
 
         return {
