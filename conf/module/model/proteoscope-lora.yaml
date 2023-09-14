@@ -21,7 +21,21 @@ guidance_scale: 3.0
 ema_decay: 0.9999
 ema_update_after_step: 1_000
 scheduler: ddim
-esm: null
+esm:
+  d_model: 1280 # cross_attention_dim 1280 2560
+  model_name: 'esm2_t33_650M_UR50D' # esm2_t33_650M_UR50D
+  embedding_layer: 33 # 33 36
+  truncation_seq_length: 1024
+  lora:
+    target_modules:
+      - "k_proj"
+      - "v_proj"
+      - "q_proj"
+      - "out_proj"
+    inference_mode: False
+    r: 4
+    lora_alpha: 4
+    lora_dropout: 0.1
 esm_bottleneck:
   d_init: 1280
   d_model: 0 # cross_attention_dim

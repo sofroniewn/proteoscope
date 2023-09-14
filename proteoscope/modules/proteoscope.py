@@ -111,6 +111,7 @@ class ProteoscopeLM(LightningModule):
             self.unet,
             beta=module_config.model.ema_decay,
             update_after_step=module_config.model.ema_update_after_step,
+            include_online_model=False,
         )
         self.latents_shape = (
             module_config.model.out_channels,
@@ -513,10 +514,20 @@ class ProteoscopeLM(LightningModule):
             only_cross_attention(self.unet)
             all_requires_grad(self.esm_bottleneck)
 
+        if self.cytoself is not None:
+            for param in self.cytoself.parameters():
+                    param.requires_grad = False
+
+        if self.autoencoder is not None:
+            for param in self.autoencoder.parameters():
+                    param.requires_grad = False
+
         params = list(self.unet.parameters()) + list(self.esm_bottleneck.parameters())
 
         if self.esm is not None:
             params = params + list(self.esm.parameters())
+
+        params = [p for p in params if p.requires_grad]
 
         optimizer = optim.AdamW(
             params,

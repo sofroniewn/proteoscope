@@ -5,17 +5,17 @@ defaults:
   - data: data-proteoscope-lora # data data-proteoloc data-proteoloc-lora data-proteoscope-lora
   - module/optimizer: adamw
   - trainer:  cuda-proteoscope-lora # cuda  cuda-proteoloc  cuda-proteoloc-lora cuda-proteoscope-lora
-  - module/model: proteoscope # proteoloc-lora
+  - module/model: proteoscope-lora # proteoloc-lora
   - splits: standard # all_proteins, standard, train_proteins
 
 hydra:
   run:
     dir: /home/ec2-user/outputs/proteoscope/${now:%Y-%m-%d}/${now:%H-%M-%S}
 
-chkpt: /home/ec2-user/outputs/proteoscope/2023-09-14/01-16-30/checkpoints/last.ckpt #last.ckpt # null
-reset: False # True/ False
-# chkpt: /home/ec2-user/outputs/proteoscope/2023-09-05/05-49-46/checkpoints/last.ckpt #last.ckpt # null
-# reset: True # True/ False
+# chkpt: null #/home/ec2-user/outputs/proteoscope/2023-09-14/01-16-30/checkpoints/last.ckpt #last.ckpt # null
+# reset: False # True/ False
+chkpt: /home/ec2-user/outputs/proteoscope/2023-09-05/05-49-46/checkpoints/last.ckpt #last.ckpt # null
+reset: True # True/ False
 module:
   dropout: 0.2
   image_height: 100
