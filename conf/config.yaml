@@ -2,10 +2,10 @@ model_type: proteoscope #cytoself proteoscope autoencoder proteoloc
 
 defaults:
   - _self_
-  - data: data-proteoscope-lora # data data-loc data-loc-esm data-proteoscope-lora
+  - data: data-proteoscope-lora # data data-proteoloc data-proteoloc-lora data-proteoscope-lora
   - module/optimizer: adamw
-  - trainer:  cuda-proteoscope-lora # cuda  cuda-loc  cuda-loc-esm cuda-proteoscope-lora
-  - module/model: proteoscope # proteoloc-esm
+  - trainer:  cuda-proteoscope-lora # cuda  cuda-proteoloc  cuda-proteoloc-lora cuda-proteoscope-lora
+  - module/model: proteoscope # proteoloc-lora
   - splits: standard # all_proteins, standard, train_proteins
 
 hydra:
