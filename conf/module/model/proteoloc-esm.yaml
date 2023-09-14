@@ -1,7 +1,7 @@
-d_model: 2560 # cross_attention_dim 1280 2560
+d_model: 1280 # cross_attention_dim 1280 2560
 num_class: 10
-esm_model: 'esm2_t36_3B_UR50D' # esm2_t33_650M_UR50D
-embedding_layer: 36 # 33 36
+esm_model: 'esm2_t33_650M_UR50D' # esm2_t33_650M_UR50D
+embedding_layer: 33 # 33 36
 truncation_seq_length: 1024
 lora:
   target_modules:
@@ -9,9 +9,7 @@ lora:
     - "v_proj"
     - "q_proj"
     - "out_proj"
-    - "fc1"
-    - "fc2"
   inference_mode: False
-  r: 8 # 32
-  lora_alpha: 32
+  r: 4
+  lora_alpha: 4
   lora_dropout: 0.1

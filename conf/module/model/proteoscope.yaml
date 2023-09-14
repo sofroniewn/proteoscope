@@ -6,12 +6,12 @@ block_out_channels: [128, 256, 512]
 latent_channels: 4
 down_block_types: ['CrossAttnDownBlock2D', 'CrossAttnDownBlock2D', 'DownBlock2D']
 up_block_types: ['UpBlock2D', 'CrossAttnUpBlock2D', 'CrossAttnUpBlock2D']
-cross_attention_dim: 2560
+cross_attention_dim: 1280
 num_train_timesteps: 1000
 num_val_timesteps: 50
 cond_images: True
 freeze_cross_attention: False
-only_cross_attention: False
+only_cross_attention: True
 sequence_condition_probability: 0.8
 unconditioned_initial_steps: null
 sequence_condition_ramp_steps: null
@@ -21,8 +21,23 @@ guidance_scale: 3.0
 ema_decay: 0.9999
 ema_update_after_step: 1_000
 scheduler: ddim
+esm:
+  d_model: 1280 # cross_attention_dim 1280 2560
+  model_name: 'esm2_t33_650M_UR50D' # esm2_t33_650M_UR50D
+  embedding_layer: 33 # 33 36
+  truncation_seq_length: 1024
+  lora:
+    target_modules:
+      - "k_proj"
+      - "v_proj"
+      - "q_proj"
+      - "out_proj"
+    inference_mode: False
+    r: 4
+    lora_alpha: 4
+    lora_dropout: 0.1
 esm_bottleneck:
-  d_init: 2560
+  d_init: 1280
   d_model: 0 # cross_attention_dim
   nhead: 4
   num_encoder_layers: 0

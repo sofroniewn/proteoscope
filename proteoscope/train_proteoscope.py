@@ -30,7 +30,7 @@ def train_proteoscope(config: ProteoscopeConfig) -> None:
 
     if config.reset:
         checkpoint = torch.load(config.chkpt)
-        clm.load_state_dict(checkpoint['state_dict'])
+        clm.load_state_dict(checkpoint['state_dict'], strict=False)
         del checkpoint
         ckpt_path = None
     else:

@@ -9,6 +9,8 @@ from pytorch_lightning import LightningModule
 from tqdm.auto import tqdm
 from torchvision.transforms.functional import resize
 from ema_pytorch import EMA
+import esm
+from peft import LoraConfig, get_peft_model
 
 from .autoencoder import AutoencoderLM
 from .cytoself import CytoselfLM
@@ -131,6 +133,18 @@ class ProteoscopeLM(LightningModule):
         self.num_val_timesteps = module_config.model.num_val_timesteps
         self.cond_images = module_config.model.cond_images
 
+        if module_config.model.esm is None:
+            self.esm = None
+            self.esm_converter = None
+            self.esm_embedding_layer = None
+        else:
+            self.esm, alphabet = esm.pretrained.load_model_and_alphabet_hub(module_config.model.esm.model_name)
+            if module_config.model.esm.lora is not None:
+                peft_config = LoraConfig(**module_config.model.esm.lora)
+                self.esm = get_peft_model(self.esm, peft_config)
+            self.esm_converter = alphabet.get_batch_converter(module_config.model.esm.truncation_seq_length)
+            self.esm_embedding_layer = module_config.model.esm.embedding_layer
+
         self.esm_bottleneck = ESMBottleneck(module_config.model.esm_bottleneck)
 
         self.freeze_cross_attention = module_config.model.freeze_cross_attention
@@ -183,10 +197,32 @@ class ProteoscopeLM(LightningModule):
         self.psnr = PSNR()
         self.results = []
 
-    def forward(self, batch, sequence_condition_probability=1.0):        
+    def embed_sequence(self, batch, sequence_condition_probability=1.0):
+        if self.esm is None:
+            seq_embeds = batch["sequence_embed"]
+            seq_mask = batch["sequence_mask"]
+        else:
+            labels = batch['index']
+            sequence = batch['peptide']
+            result = list(zip(labels, sequence))
+            labels, strs, toks = self.esm_converter(result)
+            toks = toks.to(self.device)
+            embedding_layer = self.esm_embedding_layer
+            out = self.esm(toks, repr_layers=[embedding_layer], return_contacts=False)
+            seq_embeds = out["representations"][embedding_layer]
+            seq_embeds = seq_embeds[:, 1:-1]
+            seq_mask = torch.zeros(seq_embeds.shape[:-1]).bool().to(self.device)
+            for i, ind in enumerate(batch['truncation']):
+                seq_mask[i, :ind] = True
+
         seq_embeds, seq_mask = self.esm_bottleneck(
-            batch["sequence_embed"], batch["sequence_mask"], sequence_condition_probability
+            seq_embeds, seq_mask, sequence_condition_probability
         )
+
+        return seq_embeds, seq_mask
+
+    def forward(self, batch, sequence_condition_probability=1.0):        
+        seq_embeds, seq_mask = self.embed_sequence(batch, sequence_condition_probability)
 
         if self.cond_images:
             cond_images = batch["nuclei_distance"]
@@ -365,9 +401,7 @@ class ProteoscopeLM(LightningModule):
         else:
             generator = None
 
-        seq_embeds, seq_mask = self.esm_bottleneck(
-            batch["sequence_embed"], batch["sequence_mask"]
-        )
+        seq_embeds, seq_mask = self.embed_sequence(batch)
 
         if cond_images is None and self.cond_images:
             cond_images = batch["nuclei_distance"]
@@ -481,8 +515,8 @@ class ProteoscopeLM(LightningModule):
 
         params = list(self.unet.parameters()) + list(self.esm_bottleneck.parameters())
 
-        if self.freeze_cross_attention or self.only_cross_attention:
-            params = [p for p in params if p.requires_grad]
+        if self.esm is not None:
+            params = params + list(self.esm.parameters())
 
         optimizer = optim.AdamW(
             params,
