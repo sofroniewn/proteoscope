@@ -11,7 +11,7 @@ num_train_timesteps: 1000
 num_val_timesteps: 50
 cond_images: True
 freeze_cross_attention: False
-only_cross_attention: False
+only_cross_attention: True
 sequence_condition_probability: 0.8
 unconditioned_initial_steps: null
 sequence_condition_ramp_steps: null

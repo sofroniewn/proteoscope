@@ -1,3 +1,4 @@
+image_height: 100
 in_channels: 2
 out_channels: 2
 layers_per_block: 2
@@ -5,9 +6,12 @@ block_out_channels: [128, 256, 512]
 latent_channels: 4
 down_block_types: ['DownEncoderBlock2D', 'DownEncoderBlock2D', 'DownEncoderBlock2D']
 up_block_types: ['UpDecoderBlock2D', 'UpDecoderBlock2D', 'UpDecoderBlock2D']
+classifier:
+  num_class: 1049
+  dropout: 0.2
 loss:
-  classifier_weight: 0.1
-  kl_weight: 1e-6
+  classifier_weight: 1.0
+  kl_weight: 1e-7
   perceptual_weight: 2.0
   pixel_weight: 1.0
   disc_weight: 1.0

@@ -2,14 +2,13 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from diffusers import AutoencoderKL
-from torch.optim.lr_scheduler import CosineAnnealingLR
 from omegaconf import OmegaConf
 from piqa import SSIM
 from pytorch_lightning import LightningModule
 
-# from torchvision.ops import MLP
-# from torchmetrics.image.lpip import LearnedPerceptualImagePatchSimilarity
+from torchvision.ops import MLP
 from ..losses import LPIPSWithDiscriminator
+from .scheduler import get_cosine_schedule_with_warmup
 
 
 def combine_images(img_set1, img_set2):
@@ -46,24 +45,26 @@ class AutoencoderLM(LightningModule):
         )
         self.automatic_optimization = False
 
-        # height = module_config.image_height / (
-        #     2 ** (len(module_config.model.block_out_channels) - 1)
-        # )
-        # in_channels = int(module_config.model.latent_channels * height * height)
-        # self.classifier = MLP(
-        #     in_channels,
-        #     [in_channels * 2, module_config.num_class],
-        #     dropout=module_config.dropout,
-        #     inplace=False,
-        # )
-
+        height = module_config.model.image_height / (
+            2 ** (len(module_config.model.block_out_channels) - 1)
+        )
+        in_channels = int(module_config.model.latent_channels * height * height)
         self.optim_config = module_config.optimizer
 
-        # self.image_criterion = nn.L1Loss()
-        # self.perceptual_criterion = LearnedPerceptualImagePatchSimilarity(
-        #     net_type="vgg"
-        # )
-        # self.labels_criterion = nn.CrossEntropyLoss()
+        if module_config.model.classifier is not None:
+            self.classifier = MLP(
+                in_channels,
+                [in_channels * 2, module_config.model.classifier.num_class],
+                dropout=module_config.model.classifier.dropout,
+                inplace=False,
+            )
+
+            self.classifier_criterion = nn.CrossEntropyLoss()
+            self.classifier_weight = module_config.model.loss.classifier_weight
+        else:
+            self.classifier = None
+            self.classifier_criterion = None
+            self.classifier_weight = 0.0
 
         self.ssim = SSIM(n_channels=1)
         self.results = []
@@ -80,21 +81,24 @@ class AutoencoderLM(LightningModule):
             z = posterior.mode()
 
         reconstructed = self.vae.decode(z).sample.clip(0, 1)
-        # logits = self.classifier(z.reshape(z.shape[0], -1))
+        if self.classifier is not None:
+            logits = self.classifier(z.reshape(z.shape[0], -1))
+        else:
+            logits = None
 
         if return_embed:
-            return reconstructed, posterior, z
+            return reconstructed, posterior, logits, z
         else:
-            return reconstructed, posterior
+            return reconstructed, posterior, logits
 
     def training_step(self, batch, batch_idx):
         optimizer_ae, optimizer_disc = self.optimizers()
         scheduler_ae, scheduler_disc = self.lr_schedulers()
 
         inputs = batch["image"]
-        # labels = batch["label"]
-        reconstructions, posterior = self(inputs)
-
+        labels = batch["label"]
+        reconstructions, posterior, logits = self(inputs)
+    
         # train encoder+decoder+logvar
         aeloss, log_dict_ae = self.loss(
             inputs,
@@ -111,12 +115,26 @@ class AutoencoderLM(LightningModule):
             prog_bar=True,
             logger=True,
             on_step=True,
-            on_epoch=True,
+            on_epoch=False,
         )
         self.log_dict(
             log_dict_ae, prog_bar=False, logger=True, on_step=True, on_epoch=False
         )
 
+        if self.classifier is not None:
+            class_loss = self.classifier_criterion(logits, labels)
+
+            self.log(
+                "classloss",
+                class_loss,
+                prog_bar=True,
+                logger=True,
+                on_step=True,
+                on_epoch=False,
+            )
+
+            aeloss = aeloss + self.classifier_weight * class_loss
+        
         optimizer_ae.zero_grad()
         self.manual_backward(aeloss)
         optimizer_ae.step()
@@ -139,7 +157,7 @@ class AutoencoderLM(LightningModule):
             prog_bar=True,
             logger=True,
             on_step=True,
-            on_epoch=True,
+            on_epoch=False,
         )
         self.log_dict(
             log_dict_disc, prog_bar=False, logger=True, on_step=True, on_epoch=False
@@ -152,8 +170,7 @@ class AutoencoderLM(LightningModule):
 
     def validation_step(self, batch, batch_idx):
         inputs = batch["image"]
-        # labels = batch["label"]
-        reconstructions, posterior = self(inputs)
+        reconstructions, posterior, _ = self(inputs)
 
         aeloss, log_dict_ae = self.loss(
             inputs,
@@ -174,7 +191,6 @@ class AutoencoderLM(LightningModule):
             last_layer=self.get_last_layer(),
             split="val",
         )
-
         self.log(
             "val_loss",
             log_dict_ae["val/rec_loss"],
@@ -277,19 +293,20 @@ class AutoencoderLM(LightningModule):
             weight_decay=self.optim_config.weight_decay,
         )
 
-        lr_scheduler_ae = CosineAnnealingLR(
+        lr_scheduler_ae = get_cosine_schedule_with_warmup(
             optimizer_ae,
-            T_max=self.optim_config.max_iters,
-            eta_min=self.optim_config.learning_rate_min_factor
-            * self.optim_config.learning_rate,
+            num_warmup_steps=self.optim_config.warmup,
+            num_training_steps=self.optim_config.max_iters,
+            min_value = self.optim_config.learning_rate_min_factor,
         )
 
-        lr_scheduler_disc = CosineAnnealingLR(
+        lr_scheduler_disc = get_cosine_schedule_with_warmup(
             optimizer_disc,
-            T_max=self.optim_config.max_iters,
-            eta_min=self.optim_config.learning_rate_min_factor
-            * self.optim_config.learning_rate,
+            num_warmup_steps=self.optim_config.warmup,
+            num_training_steps=self.optim_config.max_iters,
+            min_value = self.optim_config.learning_rate_min_factor,
         )
+
         return (
             {
                 "optimizer": optimizer_ae,

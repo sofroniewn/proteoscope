@@ -62,18 +62,14 @@ def default_weights_init(m):
 def only_cross_attention(model):
     for module in model.modules():
         for param in module.parameters():
-            param.requires_grad = True
+            param.requires_grad = False
     for module in model.modules():
         if isinstance(module, BasicTransformerBlock):
             crossattention = module.attn2
             if crossattention is not None:
                 crossattention.apply(default_weights_init)
-                # for param in crossattention.parameters():
-                #     param.requires_grad = True
-                # for param in module.norm2.parameters():
-                #     param.requires_grad = True
-                # for param in module.ff.parameters():
-                #     param.requires_grad = True
+                for param in crossattention.parameters():
+                    param.requires_grad = True
 
 
 class LinearRampScheduler:

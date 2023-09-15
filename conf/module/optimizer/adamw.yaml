@@ -5,4 +5,4 @@ beta_2: 0.98
 eps: 0.00000001 # 1e-8
 weight_decay: 0.01
 warmup: 200 # in steps, 2869 steps / epoch if batch size 4 * 4 * 64
-max_iters: 60_000 # 60_000 ~ steps for 10 epochs - always do 2 x expectected for cosine
+max_iters: 120_000 # 60_000 ~ steps for 10 epochs - always do 2 x expectected for cosine
