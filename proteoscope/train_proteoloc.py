@@ -19,9 +19,8 @@ def train_proteoloc(config: ProteoscopeConfig) -> None:
     )
     pdm.setup()
 
-    plm = ProteolocLM(
-        module_config=config.module,
-    )
+    plm = ProteolocLM(module_config=config.module)
+
     print(plm)
     print(f"Train samples {len(pdm.train_dataset)}, Val samples {len(pdm.val_dataset)}")
 

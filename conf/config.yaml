@@ -1,16 +1,16 @@
-model_type: proteoscope #cytoself proteoscope autoencoder proteoloc
+model_type: proteoclip #cytoself proteoscope autoencoder proteoloc proteoclip
 
 defaults:
   - _self_
-  - data: data # data data-proteoloc data-proteoloc-lora data-proteoscope-lora
+  - data: data-proteoclip-lora # data data-proteoloc data-proteoloc-lora data-proteoscope-lora
   - module/optimizer: adamw
-  - trainer:  cuda # cuda  cuda-proteoloc  cuda-proteoloc-lora cuda-proteoscope-lora
-  - module/model: proteoscope # proteoloc-lora proteoscope-lora
+  - trainer:  cuda-proteoclip-lora # cuda  cuda-proteoloc  cuda-proteoloc-lora cuda-proteoscope-lora
+  - module/model: proteoclip-lora # proteoloc-lora proteoscope-lora
   - splits: standard # all_proteins, standard, train_proteins for cytoself use all_proteins
 
 hydra:
   run:
-    dir: /home/ec2-user/outputs/proteoscope/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    dir: /home/ec2-user/outputs/proteoclip/${now:%Y-%m-%d}/${now:%H-%M-%S}
 
 chkpt: null #/home/ec2-user/outputs/proteoscope/2023-09-15/06-06-05/checkpoints/last.ckpt #last.ckpt # null
 reset: False # True/ False

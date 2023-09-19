@@ -277,9 +277,36 @@ class ProteoscopeLM(LightningModule):
             encoder_attention_mask=seq_mask,
             return_dict=False,
         )[0]
-        loss = F.mse_loss(noise_pred, noise)
 
-        return loss
+        noise_mse_loss = F.mse_loss(noise_pred, noise)
+        return noise_mse_loss
+
+        # # Generate predicted latents
+        # self.noise_scheduler.alphas_cumprod = self.noise_scheduler.alphas_cumprod.to(self.device)
+        # self.noise_scheduler.final_alpha_cumprod = self.noise_scheduler.final_alpha_cumprod.to(self.device)
+        # prev_timestep = timesteps - 1
+        # alpha_prod_t = self.noise_scheduler.alphas_cumprod[timesteps]
+        # alpha_prod_t_prev = torch.where(prev_timestep >= 0, self.noise_scheduler.alphas_cumprod[prev_timestep], self.noise_scheduler.final_alpha_cumprod)
+        # beta_prod_t = 1 - alpha_prod_t
+        # pred_original_sample = (noisy_latents - beta_prod_t ** (0.5) * noise_pred) / alpha_prod_t ** (0.5)
+        # pred_sample_direction = (1 - alpha_prod_t_prev) ** (0.5) * noise_pred
+        # latents_pred = alpha_prod_t_prev ** (0.5) * pred_original_sample + pred_sample_direction        
+        # output_latents = latents_pred * self.latents_init_scale
+
+        # # Generate predicted images and score
+        # output_images = self.autoencoder.decode(output_latents).sample.clip(0, 1)
+        # scores = self.score(batch["image"], output_images, batch["label"])
+
+        # scores['noise_mse'] = noise_mse_loss
+        # scores["ssim_pro"] = 1 - scores["ssim_pro"]
+        # scores["ssim_nuc"] = 1 - scores["ssim_nuc"]
+        # scores["psnr_pro"] = -scores["psnr_pro"]
+        # scores["psnr_nuc"] = -scores["psnr_nuc"]
+
+        # loss = 0
+        # for k, v in scores.items():
+        #     loss += v
+        # return loss
 
     def training_step(self, batch, batch_idx, dataloader_idx=0):
         if self.freeze_cross_attention:
@@ -324,15 +351,16 @@ class ProteoscopeLM(LightningModule):
             add_dataloader_idx=False,
         )
 
-        output_latents = self.sample(
-            batch,
-            guidance_scale=self.guidance_scale,
-            num_inference_steps=self.num_val_timesteps,
-            seed=42,
-        )
-        output_images = self.autoencoder.decode(output_latents).sample.clip(0, 1)
+        with torch.no_grad():
+            output_latents = self.sample(
+                batch,
+                guidance_scale=self.guidance_scale,
+                num_inference_steps=self.num_val_timesteps,
+                seed=42,
+            )
+            output_images = self.autoencoder.decode(output_latents).sample.clip(0, 1)
 
-        scores = self.score(batch["image"], output_images, batch["label"])
+            scores = self.score(batch["image"], output_images, batch["label"])
 
         for key, value in scores.items():
             self.log(
@@ -463,7 +491,6 @@ class ProteoscopeLM(LightningModule):
 
         return latents * self.latents_init_scale
 
-    @torch.no_grad()
     def score(self, input_image, output_image, labels):
         scores = {}
 
@@ -479,9 +506,9 @@ class ProteoscopeLM(LightningModule):
         scores["cytoself_distance"] = F.mse_loss(
             input_cytoself_embed, output_cytoself_embed
         )
-        scores["cytoself_input_classifcation"] = F.cross_entropy(
-            input_cytoself_logits, labels
-        )
+        # scores["cytoself_input_classifcation"] = F.cross_entropy(
+        #     input_cytoself_logits, labels
+        # )
         scores["cytoself_output_classifcation"] = F.cross_entropy(
             output_cytoself_logits, labels
         )
