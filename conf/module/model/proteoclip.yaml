@@ -2,7 +2,7 @@ image_embedding_dims: 2500
 protein_embedding_dims: 2560
 projection_dims: 1024
 dropout: 0.2
-temperature: 1.0
+bias: 0.3
 esm: null
 esm_bottleneck:
   d_init: 2560

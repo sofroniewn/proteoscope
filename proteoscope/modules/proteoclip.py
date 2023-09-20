@@ -1,17 +1,11 @@
 import torch
-import torch.nn.functional as F
 import torch.nn as nn
 import torch.optim as optim
-from diffusers import DDPMScheduler, DDIMScheduler, UNet2DConditionModel
-from diffusers.models.attention import BasicTransformerBlock
-from piqa import SSIM, PSNR
 from pytorch_lightning import LightningModule
 from tqdm.auto import tqdm
-from torchvision.transforms.functional import resize
-from ema_pytorch import EMA
 import esm
 from peft import LoraConfig, get_peft_model
-import torch.distributed as dist
+import gc
 
 from .autoencoder import AutoencoderLM
 from .esm_bottleneck import ESMBottleneck
@@ -71,7 +65,6 @@ class ProteoclipLM(LightningModule):
 
         self.autoencoder = alm.vae
         self.autoencoder.eval()
-        self.autoencoder.to(self.device)
 
         self.image_projection = ProjectionHead(
             embedding_dim= module_config.model.image_embedding_dims,
@@ -83,21 +76,8 @@ class ProteoclipLM(LightningModule):
             projection_dim= module_config.model.projection_dims,
             dropout=module_config.model.dropout,
         )
-        self.criterion = nn.CrossEntropyLoss()
-        self.temperature =  module_config.model.temperature
-
-        self.image_embeddings = []
-        self.protein_embeddings = []
-        self.image_embeddings_val = []
-        self.protein_embeddings_val = []
-
-    def gather_all(self, tensor_list):
-        # # Gather from all processes
-        # world_size = dist.get_world_size()
-        # gathered_list = [torch.zeros_like(tensor_list[0]) for _ in range(world_size)]
-        # dist.all_gather(gathered_list, tensor_list[0])
-        # tensor_list = gathered_list
-        return torch.cat(tensor_list, dim=0)
+        self.cosine_similarity = nn.CosineSimilarity(dim=1, eps=1e-6)
+        self.bias =  module_config.model.bias
 
     def embed_sequence(self, batch, sequence_condition_probability=1.0):
         if self.esm is None:
@@ -134,91 +114,42 @@ class ProteoclipLM(LightningModule):
         with torch.no_grad():
             image_embeds = self.autoencoder.encode(batch["image"]).latent_dist.sample()
             image_embeds = image_embeds.view((image_embeds.shape[0], -1))
-        image_embeds = self.image_projection(image_embeds)
-
-        return image_embeds, seq_embeds
-
-    def clip_loss(self, image_embeddings, protein_embeddings):
-        # Create the logits
-        logits_for_images = (protein_embeddings @ image_embeddings.T) / self.temperature
-        logits_for_proteins = (image_embeddings @ protein_embeddings.T) / self.temperature
-
-        # Create a target tensor where each image/protein is its own class
-        targets = torch.arange(logits_for_images.size(0)).to(self.device)
-
-        # Compute the losses using CrossEntropyLoss
-        images_loss = self.criterion(logits_for_images, targets)
-        proteins_loss = self.criterion(logits_for_proteins, targets)
-
-        # Combine and return the losses
-        combined_loss = (images_loss + proteins_loss) / 2.0
-        return combined_loss
-
-    def training_step(self, batch, batch_idx, dataloader_idx=0):
-        image_embeds, seq_embeds = self(batch)
-
-        # Store embeddings
-        self.image_embeddings.append(image_embeds)
-        self.protein_embeddings.append(seq_embeds)
-
-        # If we've reached our effective batch size, compute the loss
-        if len(self.image_embeddings) >= self.trainer.accumulate_grad_batches:
-            # Gather embeddings across GPUs
-            all_image_embeddings = self.gather_all(self.image_embeddings)
-            all_protein_embeddings = self.gather_all(self.protein_embeddings)
-
-            # Compute the loss using all embeddings
-            loss = self.clip_loss(all_image_embeddings, all_protein_embeddings).sum()
-
-            self.log(
-                "train_loss", loss, on_step=True, on_epoch=False, prog_bar=True, logger=True
-            )
-
-            # Clear the stored embeddings for the next set of samples
-            del self.image_embeddings
-            del self.protein_embeddings
-            torch.cuda.empty_cache()
-            self.image_embeddings = []
-            self.protein_embeddings = []
             
-            return loss
+            image_embeds_negative = self.autoencoder.encode(batch["image_negative"]).latent_dist.sample()
+            image_embeds_negative = image_embeds_negative.view((image_embeds_negative.shape[0], -1))
+        image_embeds = self.image_projection(image_embeds)
+        image_embeds_negative = self.image_projection(image_embeds_negative)
+
+        return image_embeds, image_embeds_negative, seq_embeds
+
+    def triplet_loss(self, image_embeds, image_embeds_negative, seq_embeds):
+        positive_cos = self.cosine_similarity(image_embeds, seq_embeds)
+        negative_cos = self.cosine_similarity(image_embeds_negative, seq_embeds)
+        return torch.clamp_min(negative_cos - positive_cos + self.bias, 0)
+
+    def training_step(self, batch, batch_idx, dataloader_idx=0):       
+        image_embeds, image_embeds_negative, seq_embeds = self(batch)
+
+        # Compute the loss using all embeddings
+        loss = self.triplet_loss(image_embeds, image_embeds_negative, seq_embeds).mean()
+
+        self.log(
+            "train_loss", loss, on_step=True, on_epoch=False, prog_bar=True, logger=True
+        )
+
+        return loss
 
     @torch.no_grad()
     def validation_step(self, batch, batch_idx, dataloader_idx=0):
-        if len(self.image_embeddings) > 0:
-            # Clear the stored embeddings for the next set of samples
-            del self.image_embeddings
-            del self.protein_embeddings
-            torch.cuda.empty_cache()
-            self.image_embeddings = []
-            self.protein_embeddings = []
+        image_embeds, image_embeds_negative, seq_embeds = self(batch)
 
-        image_embeds, seq_embeds = self(batch)
+        # Compute the loss using all embeddings
+        loss = self.triplet_loss(image_embeds, image_embeds_negative, seq_embeds).mean()
 
-        # Store embeddings
-        self.image_embeddings_val.append(image_embeds)
-        self.protein_embeddings_val.append(seq_embeds)
+        self.log(
+            "val_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True,
 
-        # If we've reached our effective batch size, compute the loss
-        if len(self.image_embeddings_val) >= self.trainer.accumulate_grad_batches:
-            # Gather embeddings across GPUs
-            all_image_embeddings = self.gather_all(self.image_embeddings_val)
-            all_protein_embeddings = self.gather_all(self.protein_embeddings_val)
-
-            # Compute the loss using all embeddings
-            loss = self.clip_loss(all_image_embeddings, all_protein_embeddings).sum()
-
-            self.log(
-                "val_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True,
-
-            )
-
-            # Clear the stored embeddings for the next set of samples
-            del self.image_embeddings_val
-            del self.protein_embeddings_val
-            torch.cuda.empty_cache()
-            self.image_embeddings_val = []
-            self.protein_embeddings_val = []
+        )
 
     def configure_optimizers(self):
         if self.autoencoder is not None:

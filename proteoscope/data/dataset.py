@@ -17,6 +17,7 @@ class ProteoscopeDataset(Dataset):
         split_images: Optional[str] = None,
         sequences=None,
         unique_protein=False,
+        negative_images=True,
         sequence_embedding=None,
         shuffle=None,
         sequence_dropout=None,
@@ -57,6 +58,7 @@ class ProteoscopeDataset(Dataset):
             self.labels = self.labels[::downsample]
 
         self.num_label_class = len(self.labels["label"].unique())
+        self.negative_images = negative_images
 
         self.images = images
         self.trim = trim
@@ -108,6 +110,19 @@ class ProteoscopeDataset(Dataset):
         item["localization"] = row["localization"]
         item["complex"] = row["complex"]
         item["complex_fig"] = row["complex_fig"]
+
+        if self.negative_images:
+            negative_index = -1
+            while negative_index == -1:
+                negative_idx = np.random.randint(len(self))
+                negative_row = self.labels.iloc[negative_idx]
+                if negative_row.ensg != row.ensg:
+                    negative_index = negative_row.name
+            negative_images = self.images[negative_index, :, :, :3]
+            if self.trim is not None:
+                negative_images = negative_images[self.trim : -self.trim, self.trim : -self.trim]
+            negative_images = self.transform(negative_images)
+            item["image_negative"] = negative_images[:2].float()
 
         if self.sequences is not None and self.sequence_embedding is not None:
             if self.sequence_embedding == "ESM-mean":

@@ -2,10 +2,10 @@ device: cuda
 num_devices: 4 #8
 gradient_clip_val: null
 precision: 16-mixed # 16
-val_check_interval: 600 # number of actual (not effective) batches
-limit_val_batches: 4 # number of actual (not effective) batches
+val_check_interval: 64 # number of actual (not effective) batches
+limit_val_batches: 8 # number of actual (not effective) batches
 log_every_n_steps: 2 # number of actual (not effective) batches
 batch_size: 16 # 16 # for effective batch size multiply batch_size * num_devices * accumulate
-num_workers: 12
-accumulate: 4 # 4
+num_workers: 4
+accumulate: 8 # 4
 max_steps: 30_000 # => 20 epochs 30_000

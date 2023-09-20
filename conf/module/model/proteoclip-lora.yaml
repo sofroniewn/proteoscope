@@ -2,7 +2,7 @@ image_embedding_dims: 2500
 protein_embedding_dims: 1280
 projection_dims: 1024
 dropout: 0.2
-temperature: 1.0
+bias: 0.3
 esm:
   d_model: 1280 # cross_attention_dim 1280 2560
   model_name: 'esm2_t33_650M_UR50D' # esm2_t33_650M_UR50D esm2_t36_3B_UR50D
