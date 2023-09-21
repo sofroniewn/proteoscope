@@ -142,9 +142,12 @@ class ProteoscopeLM(LightningModule):
             self.esm_embedding_layer = None
         else:
             self.esm, alphabet = esm.pretrained.load_model_and_alphabet_hub(module_config.model.esm.model_name)
+            self.esm = self.esm.half()
             if module_config.model.esm.lora is not None:
                 peft_config = LoraConfig(**module_config.model.esm.lora)
                 self.esm = get_peft_model(self.esm, peft_config)
+            else:
+                self.esm.eval()
             self.esm_converter = alphabet.get_batch_converter(module_config.model.esm.truncation_seq_length)
             self.esm_embedding_layer = module_config.model.esm.embedding_layer
 
