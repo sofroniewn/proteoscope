@@ -48,6 +48,8 @@ esm_bottleneck:
 autoencoder:
   checkpoint: /home/ec2-user/outputs/autoencoder/2023-08-19/17-28-45/checkpoints/last.ckpt # 2023-08-17/05-03-37
   model:
+    image_height: 100
+    classifier: null
     in_channels: 2
     out_channels: 2
     layers_per_block: 2

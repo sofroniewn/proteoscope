@@ -11,6 +11,7 @@ from torchvision.transforms.functional import resize
 from ema_pytorch import EMA
 import esm
 from peft import LoraConfig, get_peft_model
+from contextlib import nullcontext
 
 from .autoencoder import AutoencoderLM
 from .cytoself import CytoselfLM
@@ -140,14 +141,17 @@ class ProteoscopeLM(LightningModule):
             self.esm = None
             self.esm_converter = None
             self.esm_embedding_layer = None
+            self.esm_trainable = False
         else:
             self.esm, alphabet = esm.pretrained.load_model_and_alphabet_hub(module_config.model.esm.model_name)
             self.esm = self.esm.half()
             if module_config.model.esm.lora is not None:
                 peft_config = LoraConfig(**module_config.model.esm.lora)
                 self.esm = get_peft_model(self.esm, peft_config)
+                self.esm_trainable = True
             else:
                 self.esm.eval()
+                self.esm_trainable = False
             self.esm_converter = alphabet.get_batch_converter(module_config.model.esm.truncation_seq_length)
             self.esm_embedding_layer = module_config.model.esm.embedding_layer
 
@@ -204,22 +208,23 @@ class ProteoscopeLM(LightningModule):
         self.results = []
 
     def embed_sequence(self, batch, sequence_condition_probability=1.0):
-        if self.esm is None:
-            seq_embeds = batch["sequence_embed"]
-            seq_mask = batch["sequence_mask"]
-        else:
-            labels = batch['index']
-            sequence = batch['peptide']
-            result = list(zip(labels, sequence))
-            labels, strs, toks = self.esm_converter(result)
-            toks = toks.to(self.device)
-            embedding_layer = self.esm_embedding_layer
-            out = self.esm(toks, repr_layers=[embedding_layer], return_contacts=False)
-            seq_embeds = out["representations"][embedding_layer]
-            seq_embeds = seq_embeds[:, 1:-1]
-            seq_mask = torch.zeros(seq_embeds.shape[:-1]).bool().to(self.device)
-            for i, ind in enumerate(batch['truncation']):
-                seq_mask[i, :ind] = True
+        with torch.no_grad() if not self.esm_trainable else nullcontext():
+            if self.esm is None:
+                seq_embeds = batch["sequence_embed"]
+                seq_mask = batch["sequence_mask"]
+            else:
+                labels = batch['index']
+                sequence = batch['peptide']
+                result = list(zip(labels, sequence))
+                labels, strs, toks = self.esm_converter(result)
+                toks = toks.to(self.device)
+                embedding_layer = self.esm_embedding_layer
+                out = self.esm(toks, repr_layers=[embedding_layer], return_contacts=False)
+                seq_embeds = out["representations"][embedding_layer]
+                seq_embeds = seq_embeds[:, 1:-1]
+                seq_mask = torch.zeros(seq_embeds.shape[:-1]).bool().to(self.device)
+                for i, ind in enumerate(batch['truncation']):
+                    seq_mask[i, :ind] = True
 
         seq_embeds, seq_mask = self.esm_bottleneck(
             seq_embeds, seq_mask, sequence_condition_probability
@@ -567,7 +572,7 @@ class ProteoscopeLM(LightningModule):
 
         params = list(self.unet.parameters()) + list(self.esm_bottleneck.parameters())
 
-        if self.esm is not None:
+        if self.esm is not None and self.esm_trainable:
             params = params + list(self.esm.parameters())
 
         params = [p for p in params if p.requires_grad]
