@@ -152,6 +152,8 @@ class ProteoscopeLM(LightningModule):
             else:
                 self.esm.eval()
                 self.esm_trainable = False
+                for param in self.esm.parameters():
+                    param.requires_grad = False
             self.esm_converter = alphabet.get_batch_converter(module_config.model.esm.truncation_seq_length)
             self.esm_embedding_layer = module_config.model.esm.embedding_layer
 
