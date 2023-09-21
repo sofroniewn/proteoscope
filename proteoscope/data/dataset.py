@@ -159,6 +159,12 @@ class ProteoscopeDataset(Dataset):
                         None, ...
                     ]
                     item["sequence_mask"] = torch.ones(1, dtype=torch.bool)
+        else:
+            if self.sequence_dropout is not None and torch.rand(1) < self.sequence_dropout:
+                index_drop = int(torch.randint(low=0, high=int(row["truncation"]), size=(1,)).item())
+                item["peptide"] = item["peptide"][:index_drop] + item["peptide"][index_drop+1:]
+                item["truncation"] -= 1
+        
         return item
 
 
