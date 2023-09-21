@@ -237,25 +237,25 @@ if __name__ == "__main__":
         sequences_df = sequences_df.iloc[:-1] # drop last seq added to make divisible by 4 !!!!
         num_seq = len(sequences_df)
 
-        z_embedding_prot = zarr.open(
-            output_dir + '.zarr',
-            mode="w",
-                shape=(num_seq, model_config.truncation_seq_length, model_config.embed_dim),
-                chunks=(1, None, None),
-            dtype="float16",
-        )
-
         if model_config.name == 'esmfold_v1':
             offset = 0
         else:
             # Drop BOS/ EOS 
             offset = 1 
 
+        z_embedding_prot = zarr.open(
+            output_dir + '.zarr',
+            mode="w",
+                shape=(num_seq, model_config.truncation_seq_length + 2 * offset, model_config.embed_dim),
+                chunks=(1, None, None),
+            dtype="float16",
+        )
+
         for file in tqdm(files):
             labels, strs, representations = torch.load(file)
             # Save data for each protein
             for i, label in enumerate(labels):
                 index = sequences_df.index.get_loc(label)
-                truncate_len = min(model_config.truncation_seq_length, len(strs[i]) - 2 * offset)
-                output = representations[i, offset : truncate_len + offset].detach().cpu().numpy()
+                truncate_len = min(model_config.truncation_seq_length, len(strs[i])) + 2 * offset
+                output = representations[i, : truncate_len].detach().cpu().numpy()
                 z_embedding_prot[index:(index+1), : truncate_len] = output[None, ...]

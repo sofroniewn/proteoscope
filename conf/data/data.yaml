@@ -1,6 +1,6 @@
 images_path: '/home/ec2-user/cytoself-data/images.zarr'
 labels_path: '/home/ec2-user/cytoself-data/labels.csv'
-sequences_path: '/home/ec2-user/cytoself-data/esm2_t36_3B_UR50D.zarr' # esm2_t36_3B_UR50D_35 esm2_t33_650M_UR50D.zarr esm2_t36_3B_UR50D.zarr# null
+sequences_path: '/home/ec2-user/cytoself-data/ESM_sequence_embeddings_clip_1.zarr' # esm2_t36_3B_UR50D_35 esm2_t33_650M_UR50D.zarr esm2_t36_3B_UR50D.zarr# null
 trim: null
 sequence_embedding: 'ESM-full'
 sequence_dropout: null

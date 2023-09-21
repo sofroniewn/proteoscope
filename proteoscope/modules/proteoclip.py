@@ -103,12 +103,16 @@ class ProteoclipLM(LightningModule):
 
         return seq_embeds, seq_mask
 
-    def forward(self, batch, sequence_condition_probability=1.0):        
+    def embed(self, batch, sequence_condition_probability=1.0):
         seq_embeds, seq_mask = self.embed_sequence(batch, sequence_condition_probability)
         # Mean pool
         seq_mask = seq_mask.unsqueeze(-1)
         seq_embeds = (seq_embeds * seq_mask).sum(dim=1) / seq_mask.sum(dim=1)
         seq_embeds = self.protein_projection(seq_embeds)
+        return seq_embeds   
+
+    def forward(self, batch, sequence_condition_probability=1.0):        
+        seq_embeds = self.embed(batch, sequence_condition_probability)
 
         # Create latents
         with torch.no_grad():

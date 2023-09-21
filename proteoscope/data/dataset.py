@@ -125,36 +125,40 @@ class ProteoscopeDataset(Dataset):
             item["image_negative"] = negative_images[:2].float()
 
         if self.sequences is not None and self.sequence_embedding is not None:
-            if self.sequence_embedding == "ESM-mean":
-                item["sequence_embed"] = self.sequences[
-                    item["seq_embedding_index"], 1 : 1 + row["truncation"]
-                ].mean(axis=0)[None, ...]
+            if self.sequences.ndim == 2:
+                item["sequence_embed"] = self.sequences[item["seq_embedding_index"]][None, :]
                 item["sequence_mask"] = torch.ones(1, dtype=torch.bool)
-            elif self.sequence_embedding == "one-hot":
-                item["sequence_embed"] = torch.zeros((1, 1280))
-                item["sequence_embed"][0, item["label"]] = 1.0
-                item["sequence_mask"] = torch.ones(1, dtype=torch.bool)
-            elif self.sequence_embedding == "random":
-                item["sequence_embed"] = torch.randn((1, 1280))
-                item["sequence_mask"] = torch.ones(1, dtype=torch.bool)
-            elif self.sequence_embedding == "ESM-full":
-                item["sequence_embed"] = self.sequences[item["seq_embedding_index"], 1:]
-                item["sequence_mask"] = torch.zeros(
-                    len(item["sequence_embed"]), dtype=torch.bool
-                )
-                item["sequence_mask"][: row["truncation"]] = True
+            else:
+                if self.sequence_embedding == "ESM-mean":
+                    item["sequence_embed"] = self.sequences[
+                        item["seq_embedding_index"], 1 : 1 + row["truncation"]
+                    ].mean(axis=0)[None, ...]
+                    item["sequence_mask"] = torch.ones(1, dtype=torch.bool)
+                elif self.sequence_embedding == "one-hot":
+                    item["sequence_embed"] = torch.zeros((1, 1280))
+                    item["sequence_embed"][0, item["label"]] = 1.0
+                    item["sequence_mask"] = torch.ones(1, dtype=torch.bool)
+                elif self.sequence_embedding == "random":
+                    item["sequence_embed"] = torch.randn((1, 1280))
+                    item["sequence_mask"] = torch.ones(1, dtype=torch.bool)
+                elif self.sequence_embedding == "ESM-full":
+                    item["sequence_embed"] = self.sequences[item["seq_embedding_index"], 1:]
+                    item["sequence_mask"] = torch.zeros(
+                        len(item["sequence_embed"]), dtype=torch.bool
+                    )
+                    item["sequence_mask"][: row["truncation"]] = True
 
-                if self.sequence_dropout is not None:
-                    dropout = torch.rand(1) * self.sequence_dropout
-                    num_to_flip = int(dropout * row["truncation"])
-                    random_indices = torch.randperm(row["truncation"])[:num_to_flip]
-                    item["sequence_mask"][random_indices] = False
+                    if self.sequence_dropout is not None:
+                        dropout = torch.rand(1) * self.sequence_dropout
+                        num_to_flip = int(dropout * row["truncation"])
+                        random_indices = torch.randperm(row["truncation"])[:num_to_flip]
+                        item["sequence_mask"][random_indices] = False
 
-            elif self.sequence_embedding == "ESM-bos":
-                item["sequence_embed"] = self.sequences[item["seq_embedding_index"], 0][
-                    None, ...
-                ]
-                item["sequence_mask"] = torch.ones(1, dtype=torch.bool)
+                elif self.sequence_embedding == "ESM-bos":
+                    item["sequence_embed"] = self.sequences[item["seq_embedding_index"], 0][
+                        None, ...
+                    ]
+                    item["sequence_mask"] = torch.ones(1, dtype=torch.bool)
         return item
 
 

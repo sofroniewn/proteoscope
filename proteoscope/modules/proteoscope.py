@@ -87,6 +87,11 @@ class LinearRampScheduler:
             return 1.0
 
 
+def mean_pool(seq_embeds, seq_mask):
+    seq_mask = seq_mask.unsqueeze(-1)
+    return(seq_embeds * seq_mask).sum(dim=1) / seq_mask.sum(dim=1)
+
+
 class ProteoscopeLM(LightningModule):
     def __init__(
         self,
@@ -102,6 +107,7 @@ class ProteoscopeLM(LightningModule):
             down_block_types=module_config.model.down_block_types,
             up_block_types=module_config.model.up_block_types,
             cross_attention_dim=module_config.model.cross_attention_dim,
+            time_cond_proj_dim=module_config.model.time_cond_proj_dim,
         )
         self.ema = EMA(
             self.unet,
@@ -270,11 +276,16 @@ class ProteoscopeLM(LightningModule):
         else:
             model_input = noisy_latents
 
+        if seq_embeds.shape[1] > 1:
+            timestep_cond = mean_pool(seq_embeds, seq_mask)
+        else:
+            timestep_cond = seq_embeds[:, 0, :]
         noise_pred = self.unet(
             model_input,
             timesteps,
             encoder_hidden_states=seq_embeds,
             encoder_attention_mask=seq_mask,
+            timestep_cond=timestep_cond,
             return_dict=False,
         )[0]
 
@@ -472,12 +483,18 @@ class ProteoscopeLM(LightningModule):
                     [latent_model_input, latents_cond], dim=1
                 )
 
+            if seq_embeds.shape[1] > 1:
+                timestep_cond = mean_pool(seq_embeds, seq_mask)
+            else:
+                timestep_cond = seq_embeds[:, 0, :]
+
             # predict the noise residual
             noise_pred = self.ema(
                 latent_model_input,
                 t,
                 encoder_hidden_states=seq_embeds,
                 encoder_attention_mask=seq_mask,
+                timestep_cond=timestep_cond,
             ).sample
 
             # perform guidance
