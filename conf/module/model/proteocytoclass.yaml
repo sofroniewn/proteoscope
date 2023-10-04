@@ -1,0 +1,31 @@
+protein_embedding_dims: 2560
+projection_dims: 1024 # 1024, 0
+dropout: 0.2
+classifier_weight: 10.0
+esm: null
+esm_bottleneck:
+  d_init: 2560
+  d_model: 0 # 0, 1024
+  nhead: 4
+  num_encoder_layers: 0
+  dim_feedforward: 256
+  dropout: 0.2
+  return_type: 'full'
+cytoself:
+  checkpoint: /home/ec2-user/outputs/cytoself/2023-09-02/05-17-26/checkpoints/last.ckpt # 2023-08-21/19-45-50 2023-08-17/05-03-37
+  num_class: 1311 # 1311 or 1049
+  model:
+    input_shape: [2, 100, 100]
+    emb_shapes: [[25, 25], [4, 4]]
+    output_shape: [2, 100, 100]
+    fc_output_idx: [2]
+    vq_args:
+      num_embeddings: 2048
+      embedding_dim: 64
+    fc_args:
+      num_layers: 2
+    fc_input_type: 'vqvec'
+    num_class: null
+    vq_coeff: 1.0
+    fc_coeff: 1.0
+    image_variance: 0.0167

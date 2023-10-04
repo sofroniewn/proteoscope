@@ -15,7 +15,7 @@ def main(config: ProteoscopeConfig) -> None:
     import os
 
     print("Working directory : {}".format(os.getcwd()))
-    if config.model_type in ["proteoscope", "proteoclip"]:
+    if config.model_type in ["proteoscope", "proteoclip", "proteocytoclass"]:
         train_proteoscope(config)
     elif config.model_type == "proteoloc":
         train_proteoloc(config)

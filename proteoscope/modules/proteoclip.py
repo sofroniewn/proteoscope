@@ -6,6 +6,7 @@ from tqdm.auto import tqdm
 import esm
 from peft import LoraConfig, get_peft_model
 import gc
+from contextlib import nullcontext
 
 from .autoencoder import AutoencoderLM
 from .esm_bottleneck import ESMBottleneck
@@ -16,18 +17,19 @@ class ProjectionHead(nn.Module):
     def __init__(self, embedding_dim: int, projection_dim: int, dropout: float) -> None:
         super().__init__()
         self.projection = nn.Linear(embedding_dim, projection_dim)
-        self.gelu = nn.GELU()
-        self.fc = nn.Linear(projection_dim, projection_dim)
-        self.dropout = nn.Dropout(dropout)
-        self.layer_norm = nn.LayerNorm(projection_dim)
+        # self.gelu = nn.GELU()
+        # self.fc = nn.Linear(projection_dim, projection_dim)
+        # self.dropout = nn.Dropout(dropout)
+        # self.layer_norm = nn.LayerNorm(projection_dim)
 
     def forward(self, x):
         projected = self.projection(x)
-        x = self.gelu(projected)
-        x = self.fc(x)
-        x = self.dropout(x)
-        x += projected
-        return self.layer_norm(x)
+        return projected
+        # x = self.gelu(projected)
+        # x = self.fc(x)
+        # x = self.dropout(x)
+        # x += projected
+        # return self.layer_norm(x)
 
         
 class ProteoclipLM(LightningModule):
@@ -41,12 +43,19 @@ class ProteoclipLM(LightningModule):
             self.esm = None
             self.esm_converter = None
             self.esm_embedding_layer = None
+            self.esm_trainable = False
         else:
             self.esm, alphabet = esm.pretrained.load_model_and_alphabet_hub(module_config.model.esm.model_name)
             self.esm = self.esm.half()
             if module_config.model.esm.lora is not None:
                 peft_config = LoraConfig(**module_config.model.esm.lora)
                 self.esm = get_peft_model(self.esm, peft_config)
+                self.esm_trainable = True
+            else:
+                self.esm.eval()
+                self.esm_trainable = False
+                for param in self.esm.parameters():
+                    param.requires_grad = False
             self.esm_converter = alphabet.get_batch_converter(module_config.model.esm.truncation_seq_length)
             self.esm_embedding_layer = module_config.model.esm.embedding_layer
 
@@ -76,26 +85,41 @@ class ProteoclipLM(LightningModule):
             projection_dim= module_config.model.projection_dims,
             dropout=module_config.model.dropout,
         )
-        self.cosine_similarity = nn.CosineSimilarity(dim=1, eps=1e-6)
-        self.bias =  module_config.model.bias
+        self.criterion = nn.CrossEntropyLoss()
+        self.temperature =  module_config.model.temperature
+        self.image_weight = module_config.model.image_weight
+
+        self.image_embeddings = []
+        self.protein_embeddings = []
+        self.image_embeddings_val = []
+        self.protein_embeddings_val = []
+
+    def gather_all(self, tensor_list):
+        # # Gather from all processes
+        # world_size = dist.get_world_size()
+        # gathered_list = [torch.zeros_like(tensor_list[0]) for _ in range(world_size)]
+        # dist.all_gather(gathered_list, tensor_list[0])
+        # tensor_list = gathered_list
+        return torch.cat(tensor_list, dim=0)
 
     def embed_sequence(self, batch, sequence_condition_probability=1.0):
-        if self.esm is None:
-            seq_embeds = batch["sequence_embed"]
-            seq_mask = batch["sequence_mask"]
-        else:
-            labels = batch['index']
-            sequence = batch['peptide']
-            result = list(zip(labels, sequence))
-            labels, strs, toks = self.esm_converter(result)
-            toks = toks.to(self.device)
-            embedding_layer = self.esm_embedding_layer
-            out = self.esm(toks, repr_layers=[embedding_layer], return_contacts=False)
-            seq_embeds = out["representations"][embedding_layer]
-            seq_embeds = seq_embeds[:, 1:-1]
-            seq_mask = torch.zeros(seq_embeds.shape[:-1]).bool().to(self.device)
-            for i, ind in enumerate(batch['truncation']):
-                seq_mask[i, :ind] = True
+        with torch.no_grad() if not self.esm_trainable else nullcontext():
+            if self.esm is None:
+                seq_embeds = batch["sequence_embed"]
+                seq_mask = batch["sequence_mask"]
+            else:
+                labels = batch['index']
+                sequence = batch['peptide']
+                result = list(zip(labels, sequence))
+                labels, strs, toks = self.esm_converter(result)
+                toks = toks.to(self.device)
+                embedding_layer = self.esm_embedding_layer
+                out = self.esm(toks, repr_layers=[embedding_layer], return_contacts=False)
+                seq_embeds = out["representations"][embedding_layer]
+                seq_embeds = seq_embeds[:, 1:-1]
+                seq_mask = torch.zeros(seq_embeds.shape[:-1]).bool().to(self.device)
+                for i, ind in enumerate(batch['truncation']):
+                    seq_mask[i, :ind] = True
 
         seq_embeds, seq_mask = self.esm_bottleneck(
             seq_embeds, seq_mask, sequence_condition_probability
@@ -118,42 +142,117 @@ class ProteoclipLM(LightningModule):
         with torch.no_grad():
             image_embeds = self.autoencoder.encode(batch["image"]).latent_dist.sample()
             image_embeds = image_embeds.view((image_embeds.shape[0], -1))
-            
-            image_embeds_negative = self.autoencoder.encode(batch["image_negative"]).latent_dist.sample()
-            image_embeds_negative = image_embeds_negative.view((image_embeds_negative.shape[0], -1))
         image_embeds = self.image_projection(image_embeds)
-        image_embeds_negative = self.image_projection(image_embeds_negative)
+        
+        return image_embeds, seq_embeds
 
-        return image_embeds, image_embeds_negative, seq_embeds
+    def clip_loss(self, image_embeddings, protein_embeddings):
+        # Create the logits
+        logits_for_images = (protein_embeddings @ image_embeddings.T) / self.temperature
+        logits_for_proteins = (image_embeddings @ protein_embeddings.T) / self.temperature
 
-    def triplet_loss(self, image_embeds, image_embeds_negative, seq_embeds):
-        positive_cos = self.cosine_similarity(image_embeds, seq_embeds)
-        negative_cos = self.cosine_similarity(image_embeds_negative, seq_embeds)
-        return torch.clamp_min(negative_cos - positive_cos + self.bias, 0)
+        # Create a target tensor where each image/protein is its own class
+        targets = torch.arange(logits_for_images.size(0)).to(self.device)
+
+        # Compute the losses using CrossEntropyLoss
+        images_loss = self.criterion(logits_for_images, targets)
+        proteins_loss = self.criterion(logits_for_proteins, targets)
+
+        return images_loss.mean(), proteins_loss.mean()
 
     def training_step(self, batch, batch_idx, dataloader_idx=0):       
-        image_embeds, image_embeds_negative, seq_embeds = self(batch)
+        if len(self.image_embeddings_val) > 0:
+            # Clear the stored embeddings for the next set of samples
+            del self.image_embeddings_val
+            del self.protein_embeddings_val
+            self.image_embeddings_val = []
+            self.protein_embeddings_val = []
+        
+        image_embeds, seq_embeds = self(batch)
 
-        # Compute the loss using all embeddings
-        loss = self.triplet_loss(image_embeds, image_embeds_negative, seq_embeds).mean()
+        # Store embeddings
+        self.image_embeddings.append(image_embeds)
+        self.protein_embeddings.append(seq_embeds)
 
-        self.log(
-            "train_loss", loss, on_step=True, on_epoch=False, prog_bar=True, logger=True
-        )
+        # If we've reached our effective batch size, compute the loss
+        if len(self.image_embeddings) >= self.trainer.accumulate_grad_batches:
+            # Gather embeddings across GPUs
+            all_image_embeddings = self.gather_all(self.image_embeddings)
+            all_protein_embeddings = self.gather_all(self.protein_embeddings)
 
-        return loss
+            # Compute the loss using all embeddings
+            images_loss,  proteins_loss = self.clip_loss(all_image_embeddings, all_protein_embeddings)
+
+            # Combine and return the losses
+            loss = self.image_weight * images_loss + (1 - self.image_weight) * proteins_loss
+
+            self.log(
+                "train_loss_im", images_loss, on_step=True, on_epoch=False, prog_bar=True, logger=True
+            )
+
+            self.log(
+                "train_loss_pro", proteins_loss, on_step=True, on_epoch=False, prog_bar=True, logger=True
+            )
+
+            self.log(
+                "train_loss", loss, on_step=True, on_epoch=False, prog_bar=True, logger=True
+            )
+
+            # Clear the stored embeddings for the next set of samples
+            del self.image_embeddings
+            del self.protein_embeddings
+            self.image_embeddings = []
+            self.protein_embeddings = []
+
+            return loss
 
     @torch.no_grad()
     def validation_step(self, batch, batch_idx, dataloader_idx=0):
-        image_embeds, image_embeds_negative, seq_embeds = self(batch)
+        if len(self.image_embeddings) > 0:
+            # Clear the stored embeddings for the next set of samples
+            del self.image_embeddings
+            del self.protein_embeddings
+            self.image_embeddings = []
+            self.protein_embeddings = []
 
-        # Compute the loss using all embeddings
-        loss = self.triplet_loss(image_embeds, image_embeds_negative, seq_embeds).mean()
+        image_embeds, seq_embeds = self(batch)
 
-        self.log(
-            "val_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True,
+        # Store embeddings
+        self.image_embeddings_val.append(image_embeds)
+        self.protein_embeddings_val.append(seq_embeds)
 
-        )
+        # If we've reached our effective batch size, compute the loss
+        if len(self.image_embeddings_val) >= self.trainer.accumulate_grad_batches:
+            # Gather embeddings across GPUs
+            all_image_embeddings = self.gather_all(self.image_embeddings_val)
+            all_protein_embeddings = self.gather_all(self.protein_embeddings_val)
+
+            # Compute the loss using all embeddings
+            images_loss,  proteins_loss = self.clip_loss(all_image_embeddings, all_protein_embeddings)
+
+            # Combine and return the losses
+            loss = self.image_weight * images_loss + (1 - self.image_weight) * proteins_loss
+
+            self.log(
+                "val_loss_im", images_loss, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True,
+
+            )
+
+            self.log(
+                "val_loss_pro", proteins_loss, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True,
+
+            )
+
+            self.log(
+                "val_loss", loss, on_step=False, on_epoch=True, prog_bar=True, logger=True, sync_dist=True,
+
+            )
+
+            # Clear the stored embeddings for the next set of samples
+            del self.image_embeddings_val
+            del self.protein_embeddings_val
+            self.image_embeddings_val = []
+            self.protein_embeddings_val = []
 
     def configure_optimizers(self):
         if self.autoencoder is not None:

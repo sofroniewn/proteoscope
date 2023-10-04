@@ -5,7 +5,7 @@ from pytorch_lightning.loggers import TensorBoardLogger
 
 from .config import ProteoscopeConfig
 from .data import ProteoscopeDM
-from .modules import ProteoscopeLM, ProteoclipLM
+from .modules import ProteoscopeLM, ProteoclipLM, ProteocytoclassLM
 
 
 def train_proteoscope(config: ProteoscopeConfig) -> None:
@@ -27,6 +27,9 @@ def train_proteoscope(config: ProteoscopeConfig) -> None:
         dls = [pdm.val_dataloader(), pdm.train_dataloader()]
     elif config.model_type == "proteoclip":
         clm = ProteoclipLM(module_config=config.module)
+        dls = pdm.val_dataloader()
+    elif config.model_type == "proteocytoclass":
+        clm = ProteocytoclassLM(module_config=config.module)
         dls = pdm.val_dataloader()
     else:
         raise ValueError(f"Unrecognized model type {config.model_type}")
