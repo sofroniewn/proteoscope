@@ -4,7 +4,7 @@
 
 from setuptools import find_packages, setup
 
-with open("README.rst") as readme_file:
+with open("README.md") as readme_file:
     readme = readme_file.read()
 
 with open("HISTORY.rst") as history_file:
@@ -18,7 +18,7 @@ requirements = [
     "piqa",
     "torch-fidelity",
     'seaborn_image',
-    "cytoself @ git+https://github.com/royerlab/cytoself.git",
+    # "cytoself @ git+https://github.com/royerlab/cytoself.git",
 ]
 
 test_requirements = ["pytest>=3"]

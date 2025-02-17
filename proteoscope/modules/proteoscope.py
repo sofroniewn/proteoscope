@@ -180,10 +180,10 @@ class ProteoscopeLM(LightningModule):
         autoencoder_checkpoint = module_config.model.autoencoder.checkpoint
         autoencoder_config = module_config.copy()
         autoencoder_config.model = module_config.model.autoencoder.model
-
         alm = AutoencoderLM.load_from_checkpoint(
             autoencoder_checkpoint,
             module_config=autoencoder_config,
+            strict=False,
         )
 
         self.autoencoder = alm.vae
@@ -198,6 +198,7 @@ class ProteoscopeLM(LightningModule):
                 cytoself_checkpoint,
                 module_config=cytoself_config,
                 num_class=module_config.model.cytoself.num_class,
+                strict=False,
             )
             self.cytoself = clm.model
             self.cytoself.eval()
@@ -520,6 +521,8 @@ class ProteoscopeLM(LightningModule):
 
     def score(self, input_image, output_image, labels):
         scores = {}
+
+        output_image = torch.nan_to_num(output_image, nan=0.0)
 
         if self.cytoself is not None:
             input_cytoself_embed = self.cytoself(input_image, "vqvec2")

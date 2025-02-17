@@ -42,12 +42,12 @@ class ProteoscopeDataset(Dataset):
         if self.split_protein is not None and self.split_images is not None:
             self.labels = labels[
                 (labels["split_protein"] == self.split_protein)
-                & (labels["split_images_fov"] == self.split_images)
+                & (labels["split_images"] == self.split_images)
             ]
         elif self.split_protein is not None:
             self.labels = labels[(labels["split_protein"] == self.split_protein)]
         elif self.split_images is not None:
-            self.labels = labels[(labels["split_images_fov"] == self.split_images)]
+            self.labels = labels[(labels["split_images"] == self.split_images)]
         else:
             self.labels = labels
 
@@ -85,7 +85,7 @@ class ProteoscopeDataset(Dataset):
             idx = self.shuffle[idx]
 
         row = self.labels.iloc[idx]
-        index = row.name
+        index = row["image_idx"]
         images = self.images[index, :, :, :3]
         if self.trim is not None:
             images = images[self.trim : -self.trim, self.trim : -self.trim]
@@ -93,7 +93,7 @@ class ProteoscopeDataset(Dataset):
 
         item = dict()
         item["index"] = index
-        item["ensg"] = row.ensg
+        item["ensg"] = row.name
         item["name"] = row["name"]
         item["loc_grade1"] = row.loc_grade1
         item["loc_grade2"] = row.loc_grade2
@@ -108,16 +108,14 @@ class ProteoscopeDataset(Dataset):
         item["image"] = images[:2].float()
         item["nuclei_distance"] = images[2].float()
         item["localization"] = row["localization"]
-        item["complex"] = row["complex"]
-        item["complex_fig"] = row["complex_fig"]
 
         if self.negative_images:
             negative_index = -1
             while negative_index == -1:
                 negative_idx = np.random.randint(len(self))
                 negative_row = self.labels.iloc[negative_idx]
-                if negative_row.ensg != row.ensg:
-                    negative_index = negative_row.name
+                if negative_row.name != row.name:
+                    negative_index = negative_row['image_idx']
             negative_images = self.images[negative_index, :, :, :3]
             if self.trim is not None:
                 negative_images = negative_images[self.trim : -self.trim, self.trim : -self.trim]
@@ -142,7 +140,7 @@ class ProteoscopeDataset(Dataset):
                     item["sequence_embed"] = torch.randn((1, 1280))
                     item["sequence_mask"] = torch.ones(1, dtype=torch.bool)
                 elif self.sequence_embedding == "ESM-full":
-                    item["sequence_embed"] = self.sequences[item["seq_embedding_index"], 1:]
+                    item["sequence_embed"] = self.sequences[item["seq_embedding_index"], :]
                     item["sequence_mask"] = torch.zeros(
                         len(item["sequence_embed"]), dtype=torch.bool
                     )

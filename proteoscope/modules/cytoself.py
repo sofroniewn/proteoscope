@@ -43,7 +43,7 @@ class CytoselfLM(LightningModule):
         )
         self.model.fc_loss = {
             f"fc{self.model.fc_output_idx[0]}_loss": self.labels_criterion(
-                output_logits, labels
+                output_logits.float(), labels.long()
             )
         }
         vq_loss = torch.stack([d["loss"] for d in self.model.vq_loss.values()]).sum()

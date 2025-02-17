@@ -25,6 +25,7 @@ class AutoencoderLM(LightningModule):
     ):
         super(AutoencoderLM, self).__init__()
 
+        self.device_type = "cuda" if torch.cuda.is_available() else "cpu"
         self.vae = AutoencoderKL(
             in_channels=module_config.model.in_channels,  # the number of input channels, 3 for RGB images
             out_channels=module_config.model.out_channels,  # the number of output channels
@@ -33,7 +34,7 @@ class AutoencoderLM(LightningModule):
             latent_channels=module_config.model.latent_channels,
             down_block_types=module_config.model.down_block_types,
             up_block_types=module_config.model.up_block_types,
-        )
+        ).to(self.device_type)
 
         self.loss = LPIPSWithDiscriminator(
             module_config.model.loss.disc_start,
@@ -42,7 +43,8 @@ class AutoencoderLM(LightningModule):
             perceptual_weight=module_config.model.loss.perceptual_weight,
             disc_weight=module_config.model.loss.disc_weight,
             disc_in_channels=module_config.model.out_channels,
-        )
+        ).to(self.device_type)
+
         self.automatic_optimization = False
 
         height = module_config.model.image_height / (
